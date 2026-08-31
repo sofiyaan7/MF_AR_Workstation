@@ -1,0 +1,20 @@
+# Keep the upload lean and, above all, keep local secrets and data out of it.
+backend/.venv
+backend/tests
+backend/.pytest_cache
+backend/alembic/__pycache__
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+.logs
+frontend/node_modules
+frontend/dist
+docker-compose.yml
+backend/Dockerfile
+frontend/Dockerfile
+backend/docker-entrypoint.sh
+frontend/nginx.conf
+start.sh
