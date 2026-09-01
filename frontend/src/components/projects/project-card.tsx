@@ -1,4 +1,4 @@
-import { ArrowUpRight, Clock, Star } from "lucide-react";
+import { ArrowUpRight, Clock, MessageSquare, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
@@ -98,9 +98,21 @@ export function ProjectCard({ project, showLastOpened, className }: ProjectCardP
             {formatRelative(project.my_last_opened_at)}
           </span>
         )}
+        {/* The detail page is where suggestions live. Without an explicit way in,
+            the only route there is the title link, which people miss because
+            the launch button is the obvious thing to click. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="ml-auto shrink-0" asChild>
+              <Link to={`/projects/${project.id}`} aria-label={`Suggestions and details for ${project.name}`}>
+                <MessageSquare />
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Details &amp; suggestions</TooltipContent>
+        </Tooltip>
         <Button
           size="sm"
-          className="ml-auto"
           disabled={!launchable || openProject.isPending}
           loading={openProject.isPending && openProject.variables?.id === project.id}
           onClick={() => openProject.mutate(project)}
