@@ -21,6 +21,25 @@ from app.services.activity_service import record_activity
 router = APIRouter(prefix="/admin/users", tags=["Admin - Users"])
 
 
+def _generate_employee_id(db, full_name: str) -> str:
+    """Derive a unique internal ID from the person's name.
+
+    Admins no longer type one, but the column is still a unique, non-null
+    identifier that the audit trail and per-project permissions key on. Initials
+    plus a counter keeps it short and human-recognisable in a log line, and the
+    loop guarantees uniqueness rather than trusting the shape to be unique.
+    """
+    initials = "".join(part[0] for part in full_name.split() if part[0].isalnum())[:4].upper()
+    prefix = initials or "EMP"
+    for n in range(1, 10000):
+        candidate = f"{prefix}{n:04d}"
+        if db.execute(
+            select(User.id).where(func.lower(User.employee_id) == candidate.lower())
+        ).first() is None:
+            return candidate
+    raise ConflictError("Could not allocate an employee ID; please set one explicitly")
+
+
 def _reject_duplicate_name(db, full_name: str, *, exclude_id: int | None = None) -> None:
     """Full names are sign-in credentials now, so they have to be unique.
 
@@ -135,11 +154,12 @@ def create_user(payload: UserCreate, admin: AdminUser, db: Db, ctx: Ctx) -> User
     if payload.role == RoleName.SUPER_ADMIN and not admin.is_super_admin:
         raise PermissionDeniedError("Only a super administrator can create super administrators.")
 
+    employee_id = payload.employee_id or _generate_employee_id(db, payload.full_name)
     existing = db.execute(
-        select(User).where(func.lower(User.employee_id) == payload.employee_id.lower())
+        select(User).where(func.lower(User.employee_id) == employee_id.lower())
     ).scalars().first()
     if existing:
-        raise ConflictError(f"Employee ID '{payload.employee_id}' is already registered")
+        raise ConflictError(f"Employee ID '{employee_id}' is already registered")
     if db.execute(
         select(User.id).where(func.lower(User.email) == payload.email.lower())
     ).first():
@@ -150,7 +170,7 @@ def create_user(payload: UserCreate, admin: AdminUser, db: Db, ctx: Ctx) -> User
     role = _get_role(db, payload.role)
 
     user = User(
-        employee_id=payload.employee_id,
+        employee_id=employee_id,
         full_name=payload.full_name.strip(),
         email=str(payload.email).lower(),
         department=(payload.department or "").strip() or None,

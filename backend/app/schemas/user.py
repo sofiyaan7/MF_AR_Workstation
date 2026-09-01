@@ -59,8 +59,18 @@ class UserAdminView(ORMModel):
 
 
 class UserCreate(BaseModel):
-    employee_id: str = Field(min_length=2, max_length=64, examples=["ARWL12345"])
+    """Creating an account needs only a name and an email address.
+
+    The name doubles as the sign-in username. ``employee_id`` stays as the
+    internal identifier the audit trail and permissions key on, but the admin
+    no longer has to invent one — it is derived from the name when omitted.
+    """
+
     full_name: str = Field(min_length=2, max_length=160)
+    employee_id: str | None = Field(
+        default=None, max_length=64, examples=["ARWL12345"],
+        description="Optional. Generated from the full name when left blank.",
+    )
     email: EmailStr
     department: str | None = Field(default=None, max_length=120)
     job_title: str | None = Field(default=None, max_length=120)
@@ -77,10 +87,14 @@ class UserCreate(BaseModel):
 
     @field_validator("employee_id")
     @classmethod
-    def _clean_employee_id(cls, v: str) -> str:
+    def _clean_employee_id(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
         v = v.strip().upper()
         if not v.replace("-", "").replace("_", "").isalnum():
             raise ValueError("Employee ID may only contain letters, numbers, hyphens and underscores")
+        if len(v) < 2:
+            raise ValueError("Employee ID must be at least 2 characters")
         return v
 
 

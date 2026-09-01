@@ -287,3 +287,56 @@ def test_profile_self_update_cannot_change_role(as_employee, db, employee):
 def test_employee_id_normalised_to_uppercase(as_admin):
     body = _create_employee(as_admin, employee_id="arwl99999", email="lower@example.com")
     assert body["user"]["employee_id"] == "ARWL99999"
+
+
+def test_creating_a_user_needs_only_a_name_and_email(client, admin_user):
+    """The admin supplies a name and an email; everything else is derived."""
+    admin = login(client, admin_user.full_name)
+    response = admin.post(
+        "/api/admin/users",
+        json={"full_name": "Ananya Krishnan", "email": "ananya.krishnan@example.com"},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+
+    # An internal identifier is allocated from the initials, not typed by hand.
+    assert body["user"]["employee_id"] == "AK0001"
+    assert body["user"]["role"] == "USER"
+    assert body["temporary_password"]
+
+    # And the new account signs in with the name that was entered.
+    admin.post("/api/auth/logout")
+    signed_in = client.post(
+        "/api/auth/login",
+        json={"username": "Ananya Krishnan", "password": body["temporary_password"]},
+    )
+    assert signed_in.status_code == 200
+
+
+def test_generated_employee_ids_do_not_collide(client, admin_user):
+    admin = login(client, admin_user.full_name)
+    first = admin.post(
+        "/api/admin/users",
+        json={"full_name": "Ravi Kumar", "email": "ravi.kumar@example.com"},
+    ).json()
+    # Same initials, different person.
+    second = admin.post(
+        "/api/admin/users",
+        json={"full_name": "Rohan Kapoor", "email": "rohan.kapoor@example.com"},
+    ).json()
+
+    assert first["user"]["employee_id"] == "RK0001"
+    assert second["user"]["employee_id"] == "RK0002"
+
+
+def test_an_explicit_employee_id_is_still_honoured(client, admin_user):
+    admin = login(client, admin_user.full_name)
+    body = admin.post(
+        "/api/admin/users",
+        json={
+            "full_name": "Meera Iyer",
+            "email": "meera.iyer@example.com",
+            "employee_id": "ARWL55555",
+        },
+    ).json()
+    assert body["user"]["employee_id"] == "ARWL55555"

@@ -165,11 +165,10 @@ export function UserFormDialog({
   const set = <K extends keyof UserFormValues>(key: K, value: UserFormValues[K]) =>
     setValues((current) => ({ ...current, [key]: value }));
 
-  const idValid = /^[A-Za-z0-9_-]{2,64}$/.test(values.employee_id.trim());
   const nameValid = values.full_name.trim().length >= 2;
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim());
   const canSubmit =
-    (isEdit || idValid) && nameValid && emailValid && !create.isPending && !update.isPending;
+    nameValid && emailValid && !create.isPending && !update.isPending;
 
   // Only a super admin may grant the super-admin role; the API enforces this too.
   const canGrantSuperAdmin = currentUser?.role === "SUPER_ADMIN";
@@ -196,7 +195,6 @@ export function UserFormDialog({
         });
       } else {
         const result = await create.mutateAsync({
-          employee_id: values.employee_id.trim().toUpperCase(),
           full_name: values.full_name.trim(),
           email: values.email.trim(),
           department: values.department.trim() || null,
@@ -231,35 +229,29 @@ export function UserFormDialog({
           <DialogTitle>{isEdit ? `Edit ${user?.full_name}` : "Add employee"}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Employee ID cannot be changed once an account exists."
-              : "Only employees added here can sign in to the portal."}
+              ? "The employee ID is fixed once an account exists."
+              : "A name and an email address are all that is needed. They sign in with the name."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="user-employee-id" required={!isEdit}>
-                Employee ID
-              </Label>
-              <Input
-                id="user-employee-id"
-                value={values.employee_id}
-                onChange={(event) => set("employee_id", event.target.value.toUpperCase())}
-                placeholder="ARWL12345"
-                className="font-mono"
-                disabled={isEdit}
-                aria-invalid={touched && !isEdit && !idValid}
-                required={!isEdit}
-              />
-              {touched && !isEdit && !idValid && (
-                <p className="text-xs text-destructive">
-                  Use 2–64 letters, numbers, hyphens or underscores.
-                </p>
-              )}
-            </div>
+            {/* Employee ID is allocated by the server from the name. It is shown
+                here only when editing, where it is fixed and worth surfacing. */}
+            {isEdit && (
+              <div className="space-y-1.5">
+                <Label htmlFor="user-employee-id">Employee ID</Label>
+                <Input
+                  id="user-employee-id"
+                  value={values.employee_id}
+                  className="font-mono"
+                  disabled
+                  readOnly
+                />
+              </div>
+            )}
 
-            <div className="space-y-1.5">
+            <div className={isEdit ? "space-y-1.5" : "space-y-1.5 sm:col-span-2"}>
               <Label htmlFor="user-full-name" required>
                 Full name
               </Label>
@@ -271,6 +263,11 @@ export function UserFormDialog({
                 aria-invalid={touched && !nameValid}
                 required
               />
+              {!isEdit && (
+                <p className="text-2xs text-muted-foreground">
+                  This is the name they sign in with, so it must be unique.
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
@@ -287,7 +284,16 @@ export function UserFormDialog({
                 required
               />
             </div>
+          </div>
 
+          {/* Everything below has a sensible default, so creating an account is
+              just a name and an email unless the admin wants more. */}
+          <details className="rounded-md border border-border px-3 py-2">
+            <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
+              Optional details — department, role, temporary password
+            </summary>
+
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="user-department">Department</Label>
               <Input
@@ -394,6 +400,8 @@ export function UserFormDialog({
               maxLength={2000}
             />
           </div>
+
+          </details>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
