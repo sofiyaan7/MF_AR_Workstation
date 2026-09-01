@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint,
+    Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,8 +31,22 @@ class Role(Base, TimestampMixin):
 
 class User(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "users"
+    # Uniqueness applies to live accounts only. Deleting is a soft delete, so a
+    # plain unique constraint would let a removed colleague keep hold of their
+    # email address and employee ID forever, blocking a genuine re-hire or a
+    # correction of a mistyped account. Users are never restored, so scoping the
+    # constraint to non-deleted rows cannot resurrect a clash.
     __table_args__ = (
-        Index("ix_users_employee_id", "employee_id", unique=True),
+        Index(
+            "ix_users_employee_id", "employee_id", unique=True,
+            postgresql_where=text("is_deleted = false"),
+            sqlite_where=text("is_deleted = 0"),
+        ),
+        Index(
+            "uq_users_email_live", "email", unique=True,
+            postgresql_where=text("is_deleted = false"),
+            sqlite_where=text("is_deleted = 0"),
+        ),
         Index("ix_users_department", "department"),
         Index("ix_users_status", "status"),
     )
@@ -40,7 +54,7 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     employee_id: Mapped[str] = mapped_column(String(64), nullable=False)
     full_name: Mapped[str] = mapped_column(String(160), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
     department: Mapped[str | None] = mapped_column(String(120))
     job_title: Mapped[str | None] = mapped_column(String(120))
     phone: Mapped[str | None] = mapped_column(String(40))

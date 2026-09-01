@@ -340,3 +340,52 @@ def test_an_explicit_employee_id_is_still_honoured(client, admin_user):
         },
     ).json()
     assert body["user"]["employee_id"] == "ARWL55555"
+
+
+def test_a_deleted_users_email_can_be_reused(client, admin_user):
+    """Deleting is a soft delete; it must not reserve the address forever."""
+    admin = login(client, admin_user.full_name)
+    first = admin.post(
+        "/api/admin/users",
+        json={"full_name": "Temp Colleague", "email": "reuse.me@example.com"},
+    )
+    assert first.status_code == 201
+    user_id = first.json()["user"]["id"]
+
+    assert admin.delete(f"/api/admin/users/{user_id}").status_code == 200
+
+    # Same address, and a different name so the name guard is not what passes it.
+    again = admin.post(
+        "/api/admin/users",
+        json={"full_name": "Replacement Colleague", "email": "reuse.me@example.com"},
+    )
+    assert again.status_code == 201, again.text
+    assert again.json()["user"]["id"] != user_id
+
+
+def test_a_deleted_users_name_can_be_reused(client, admin_user):
+    """A genuine re-hire signs in with the same name as before."""
+    admin = login(client, admin_user.full_name)
+    created = admin.post(
+        "/api/admin/users",
+        json={"full_name": "Returning Colleague", "email": "returning@example.com"},
+    )
+    assert created.status_code == 201
+    admin.delete(f"/api/admin/users/{created.json()['user']['id']}")
+
+    again = admin.post(
+        "/api/admin/users",
+        json={"full_name": "Returning Colleague", "email": "returning.2@example.com"},
+    )
+    assert again.status_code == 201, again.text
+
+
+def test_two_live_users_still_cannot_share_an_email(client, admin_user):
+    admin = login(client, admin_user.full_name)
+    admin.post(
+        "/api/admin/users", json={"full_name": "First Person", "email": "shared@example.com"}
+    )
+    clash = admin.post(
+        "/api/admin/users", json={"full_name": "Second Person", "email": "shared@example.com"}
+    )
+    assert clash.status_code == 409

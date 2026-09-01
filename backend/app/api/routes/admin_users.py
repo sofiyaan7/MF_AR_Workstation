@@ -34,7 +34,10 @@ def _generate_employee_id(db, full_name: str) -> str:
     for n in range(1, 10000):
         candidate = f"{prefix}{n:04d}"
         if db.execute(
-            select(User.id).where(func.lower(User.employee_id) == candidate.lower())
+            select(User.id).where(
+                func.lower(User.employee_id) == candidate.lower(),
+                User.is_deleted.is_(False),
+            )
         ).first() is None:
             return candidate
     raise ConflictError("Could not allocate an employee ID; please set one explicitly")
@@ -155,13 +158,21 @@ def create_user(payload: UserCreate, admin: AdminUser, db: Db, ctx: Ctx) -> User
         raise PermissionDeniedError("Only a super administrator can create super administrators.")
 
     employee_id = payload.employee_id or _generate_employee_id(db, payload.full_name)
+    # Soft-deleted accounts must not reserve an identifier; the unique indexes
+    # are scoped the same way.
     existing = db.execute(
-        select(User).where(func.lower(User.employee_id) == employee_id.lower())
+        select(User).where(
+            func.lower(User.employee_id) == employee_id.lower(),
+            User.is_deleted.is_(False),
+        )
     ).scalars().first()
     if existing:
         raise ConflictError(f"Employee ID '{employee_id}' is already registered")
     if db.execute(
-        select(User.id).where(func.lower(User.email) == payload.email.lower())
+        select(User.id).where(
+            func.lower(User.email) == payload.email.lower(),
+            User.is_deleted.is_(False),
+        )
     ).first():
         raise ConflictError(f"Email '{payload.email}' is already registered")
     _reject_duplicate_name(db, payload.full_name)
@@ -237,7 +248,9 @@ def update_user(
     if "email" in changes and changes["email"]:
         clash = db.execute(
             select(User.id).where(
-                func.lower(User.email) == str(changes["email"]).lower(), User.id != user.id
+                func.lower(User.email) == str(changes["email"]).lower(),
+                User.id != user.id,
+                User.is_deleted.is_(False),
             )
         ).first()
         if clash:
