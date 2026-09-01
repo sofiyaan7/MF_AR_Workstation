@@ -4,7 +4,7 @@ import type {
   ActivityEntry, AnalyticsOverview, AnalyticsResponse, ApiMessage, CategoryDetail,
   DashboardResponse, LoginHistoryEntry, LoginResponse, MyActivityEntry, Page,
   ProjectAdminDetail, ProjectAdminRow, ProjectCard, ProjectDetail, ProjectFormValues,
-  ProjectStatsResponse,
+  ProjectStatsResponse, Suggestion, SuggestionList, SuggestionStatus,
   RecentProject, TagRef, UserAdminView, UserProfile,
 } from "@/types";
 
@@ -61,6 +61,22 @@ export const projectsApi = {
     ),
   addFavourite: (id: number) => unwrap<ApiMessage>(api.post(`/projects/${id}/favourite`)),
   removeFavourite: (id: number) => unwrap<ApiMessage>(api.delete(`/projects/${id}/favourite`)),
+};
+
+// --------------------------------------------------------------------------
+// Suggestions (per project, visible to everyone who can see the project)
+// --------------------------------------------------------------------------
+export const suggestionsApi = {
+  list: (projectId: number, status?: SuggestionStatus) =>
+    unwrap<SuggestionList>(
+      api.get(`/projects/${projectId}/suggestions`, { params: status ? { status } : {} }),
+    ),
+  create: (projectId: number, payload: { title: string; body?: string | null }) =>
+    unwrap<Suggestion>(api.post(`/projects/${projectId}/suggestions`, payload)),
+  setStatus: (projectId: number, suggestionId: number, status: SuggestionStatus) =>
+    unwrap<Suggestion>(
+      api.patch(`/projects/${projectId}/suggestions/${suggestionId}`, { status }),
+    ),
 };
 
 // --------------------------------------------------------------------------

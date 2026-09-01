@@ -38,7 +38,7 @@ interface ProjectIconProps {
 const SIZES = {
   sm: { box: "size-8 rounded-md", glyph: "size-4" },
   md: { box: "size-10 rounded-lg", glyph: "size-5" },
-  lg: { box: "size-14 rounded-xl", glyph: "size-7" },
+  lg: { box: "size-14 rounded-lg", glyph: "size-7" },
 } as const;
 
 export function ProjectIcon({ icon, colour, seed, size = "md", className }: ProjectIconProps) {

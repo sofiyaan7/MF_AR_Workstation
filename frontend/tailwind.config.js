@@ -63,9 +63,12 @@ export default {
         "2xs": ["0.6875rem", { lineHeight: "1rem" }],
       },
       boxShadow: {
-        card: "0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06)",
-        "card-hover": "0 4px 12px -2px rgb(15 23 42 / 0.10), 0 2px 6px -2px rgb(15 23 42 / 0.06)",
-        popover: "0 10px 30px -10px rgb(15 23 42 / 0.25)",
+        // Minimalist: separation comes from hairline borders, so "card" is a
+        // no-op and the remaining shadows are only as strong as they need to
+        // be to lift a floating layer off the page.
+        card: "none",
+        "card-hover": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        popover: "0 4px 16px -6px rgb(0 0 0 / 0.14)",
       },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },

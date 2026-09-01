@@ -263,3 +263,41 @@ export interface ProjectFormValues {
   sort_order: number;
   is_active: boolean;
 }
+
+// --------------------------------------------------------------------------
+// Suggestions
+// --------------------------------------------------------------------------
+export type SuggestionStatus = "OPEN" | "CLOSED";
+
+export interface SuggestionAuthor {
+  id: number;
+  employee_id: string;
+  full_name: string;
+}
+
+export interface Suggestion {
+  id: number;
+  project_id: number;
+  title: string;
+  body: string | null;
+  status: SuggestionStatus;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  /** Null once the account that raised it has been deleted. */
+  user: SuggestionAuthor | null;
+  closed_by: SuggestionAuthor | null;
+  /** Whether the signed-in user may close or reopen this one. */
+  can_manage: boolean;
+}
+
+export interface SuggestionCounts {
+  open: number;
+  closed: number;
+  total: number;
+}
+
+export interface SuggestionList {
+  items: Suggestion[];
+  counts: SuggestionCounts;
+}

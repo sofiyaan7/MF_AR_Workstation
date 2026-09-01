@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SuggestionBox } from "@/components/suggestions/suggestion-box";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProjectIcon } from "@/components/ui/project-icon";
@@ -172,6 +173,8 @@ export function ProjectDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          <SuggestionBox projectId={project.id} />
         </div>
 
         <div className="space-y-6">

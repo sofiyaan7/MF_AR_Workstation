@@ -86,7 +86,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       {/* Mobile scrim */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] transition-opacity lg:hidden",
+          "fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity lg:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={onClose}

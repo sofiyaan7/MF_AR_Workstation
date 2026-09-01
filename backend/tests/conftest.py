@@ -182,6 +182,9 @@ class ApiClient:
     def put(self, url, **kw):
         return self.client.put(url, headers=self._headers(kw.pop("headers", None)), **kw)
 
+    def patch(self, url, **kw):
+        return self.client.patch(url, headers=self._headers(kw.pop("headers", None)), **kw)
+
     def delete(self, url, **kw):
         return self.client.delete(url, headers=self._headers(kw.pop("headers", None)), **kw)
 

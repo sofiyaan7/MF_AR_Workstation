@@ -11,6 +11,7 @@ from app.database.base import Base, SoftDeleteMixin, TimestampMixin
 from app.models.enums import ProjectStatus, Visibility
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from app.models.suggestion import Suggestion
     from app.models.user import User
 
 project_tags = Table(
@@ -110,6 +111,9 @@ class Project(Base, TimestampMixin, SoftDeleteMixin):
         back_populates="project", cascade="all, delete-orphan", lazy="selectin"
     )
     favourites: Mapped[list["Favourite"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    suggestions: Mapped[list["Suggestion"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
 
