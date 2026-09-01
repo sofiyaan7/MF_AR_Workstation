@@ -63,17 +63,24 @@ export function useProjectOwners() {
  *
  * The window is opened synchronously *before* awaiting so the browser still
  * attributes it to the click and does not block it as a popup.
+ *
+ * "noopener" must NOT go in the features string: window.open() returns null
+ * whenever it is present, which would throw away the handle needed to point
+ * the tab at the project. Clearing `opener` on the handle below gives the
+ * same protection while keeping the reference.
  */
 export function useOpenProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (project: Pick<ProjectCard, "id" | "name" | "open_in_new_tab">) => {
-      const newTab = project.open_in_new_tab ? window.open("", "_blank", "noopener,noreferrer") : null;
+      const newTab = project.open_in_new_tab ? window.open("", "_blank") : null;
+      // Cut the opener link immediately so the blank tab can never reach back
+      // into this window, even if the request below is slow or fails.
+      if (newTab) newTab.opener = null;
       try {
         const result = await projectsApi.open(project.id);
         if (newTab) {
-          newTab.opener = null;
           newTab.location.replace(result.url);
         } else {
           window.location.assign(result.url);
