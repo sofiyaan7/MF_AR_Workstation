@@ -1,5 +1,6 @@
 import {
-  BarChart3, Copy, ExternalLink, MoreHorizontal, Pencil, Plus, RotateCcw, Search, Trash2,
+  BarChart3, Copy, ExternalLink, Github, MoreHorizontal, Pencil, Plus, RotateCcw, Search,
+  Trash2,
 } from "lucide-react";
 import * as React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -32,7 +33,7 @@ import { useAdminProjects, useProjectMutations } from "@/hooks/use-admin";
 import { useCategories } from "@/hooks/use-projects";
 import { adminProjectsApi } from "@/services/endpoints";
 import { formatNumber, formatRelative } from "@/lib/format";
-import type { ProjectAdminRow, ProjectDetail } from "@/types";
+import type { ProjectAdminDetail, ProjectAdminRow } from "@/types";
 
 const ALL = "__all__";
 
@@ -46,7 +47,7 @@ export function AdminProjectsPage() {
   const [includeDeleted, setIncludeDeleted] = React.useState(false);
 
   const [formOpen, setFormOpen] = React.useState(searchParams.get("new") === "1");
-  const [editing, setEditing] = React.useState<ProjectDetail | null>(null);
+  const [editing, setEditing] = React.useState<ProjectAdminDetail | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<ProjectAdminRow | null>(null);
 
   const debouncedSearch = useDebounce(search, 250);
@@ -216,6 +217,19 @@ export function AdminProjectsPage() {
                             <Badge variant="muted" className="text-2xs">
                               Disabled
                             </Badge>
+                          )}
+                          {project.repository_url && (
+                            <a
+                              href={project.repository_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(event) => event.stopPropagation()}
+                              title={project.repository_url}
+                              aria-label={`Open the ${project.name} repository`}
+                              className="shrink-0 rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <Github className="size-3.5" />
+                            </a>
                           )}
                         </div>
                         <a

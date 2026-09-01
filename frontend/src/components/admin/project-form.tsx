@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCategories } from "@/hooks/use-projects";
 import { useProjectMutations } from "@/hooks/use-admin";
 import { cn } from "@/lib/utils";
-import type { ProjectDetail, ProjectFormValues, ProjectStatus, Visibility } from "@/types";
+import type { ProjectAdminDetail, ProjectFormValues, ProjectStatus, Visibility } from "@/types";
 
 const NO_CATEGORY = "__none__";
 
@@ -49,6 +49,7 @@ function emptyForm(): ProjectFormValues {
     description: "",
     short_description: "",
     documentation_url: "",
+    repository_url: "",
     category_id: null,
     tags: [],
     owner_name: "",
@@ -64,13 +65,14 @@ function emptyForm(): ProjectFormValues {
   };
 }
 
-function fromProject(project: ProjectDetail): ProjectFormValues {
+function fromProject(project: ProjectAdminDetail): ProjectFormValues {
   return {
     name: project.name,
     url: project.url,
     description: project.description ?? "",
     short_description: project.short_description ?? "",
     documentation_url: project.documentation_url ?? "",
+    repository_url: project.repository_url ?? "",
     category_id: project.category?.id ?? null,
     tags: project.tags.map((tag) => tag.name),
     owner_name: project.owner_name ?? "",
@@ -158,7 +160,7 @@ function ChipInput({
 interface ProjectFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  project?: ProjectDetail | null;
+  project?: ProjectAdminDetail | null;
 }
 
 export function ProjectFormDialog({ open, onOpenChange, project }: ProjectFormDialogProps) {
@@ -196,6 +198,7 @@ export function ProjectFormDialog({ open, onOpenChange, project }: ProjectFormDi
       description: values.description?.trim() || null,
       short_description: values.short_description?.trim() || null,
       documentation_url: values.documentation_url?.trim() || null,
+      repository_url: values.repository_url?.trim() || null,
     };
 
     try {
@@ -338,6 +341,20 @@ export function ProjectFormDialog({ open, onOpenChange, project }: ProjectFormDi
                 placeholder="https://wiki.internal/msci-review (optional)"
                 className="font-mono text-xs"
               />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="project-repo">Repository URL</Label>
+              <Input
+                id="project-repo"
+                value={values.repository_url ?? ""}
+                onChange={(event) => set("repository_url", event.target.value)}
+                placeholder="https://github.com/org/repo (optional)"
+                className="font-mono text-xs"
+              />
+              <p className="text-2xs text-muted-foreground">
+                Shown as a repository icon in the admin project list. Not visible to employees.
+              </p>
             </div>
           </div>
 

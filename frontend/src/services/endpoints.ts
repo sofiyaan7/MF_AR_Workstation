@@ -3,7 +3,8 @@ import { api, unwrap } from "@/services/api";
 import type {
   ActivityEntry, AnalyticsOverview, AnalyticsResponse, ApiMessage, CategoryDetail,
   DashboardResponse, LoginHistoryEntry, LoginResponse, MyActivityEntry, Page,
-  ProjectAdminRow, ProjectCard, ProjectDetail, ProjectFormValues, ProjectStatsResponse,
+  ProjectAdminDetail, ProjectAdminRow, ProjectCard, ProjectDetail, ProjectFormValues,
+  ProjectStatsResponse,
   RecentProject, TagRef, UserAdminView, UserProfile,
 } from "@/types";
 
@@ -116,15 +117,15 @@ export const adminUsersApi = {
 export const adminProjectsApi = {
   list: (params: Record<string, unknown> = {}) =>
     unwrap<Page<ProjectAdminRow>>(api.get("/admin/projects", { params })),
-  get: (id: number) => unwrap<ProjectDetail>(api.get(`/admin/projects/${id}`)),
+  get: (id: number) => unwrap<ProjectAdminDetail>(api.get(`/admin/projects/${id}`)),
   create: (payload: ProjectFormValues) =>
-    unwrap<ProjectDetail>(api.post("/admin/projects", payload)),
+    unwrap<ProjectAdminDetail>(api.post("/admin/projects", payload)),
   update: (id: number, payload: Partial<ProjectFormValues>) =>
-    unwrap<ProjectDetail>(api.put(`/admin/projects/${id}`, payload)),
+    unwrap<ProjectAdminDetail>(api.put(`/admin/projects/${id}`, payload)),
   duplicate: (id: number) =>
-    unwrap<ProjectDetail>(api.post(`/admin/projects/${id}/duplicate`)),
+    unwrap<ProjectAdminDetail>(api.post(`/admin/projects/${id}/duplicate`)),
   remove: (id: number) => unwrap<ApiMessage>(api.delete(`/admin/projects/${id}`)),
-  restore: (id: number) => unwrap<ProjectDetail>(api.post(`/admin/projects/${id}/restore`)),
+  restore: (id: number) => unwrap<ProjectAdminDetail>(api.post(`/admin/projects/${id}/restore`)),
   stats: (id: number, days = 30) =>
     unwrap<ProjectStatsResponse>(api.get(`/admin/projects/${id}/stats`, { params: { days } })),
 };

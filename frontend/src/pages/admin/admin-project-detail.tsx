@@ -1,4 +1,4 @@
-import { ExternalLink, Pencil, Star, TrendingUp, Users } from "lucide-react";
+import { ExternalLink, Github, Pencil, Star, TrendingUp, Users } from "lucide-react";
 import * as React from "react";
 import { useParams } from "react-router-dom";
 
@@ -108,15 +108,29 @@ export function AdminProjectDetailPage() {
                 </span>
               </p>
             </div>
-            <a
-              href={project.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-1.5 rounded font-mono text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <ExternalLink className="size-3" />
-              {project.url}
-            </a>
+            <div className="mt-3 flex flex-col gap-1.5">
+              <a
+                href={project.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded font-mono text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <ExternalLink className="size-3" />
+                {project.url}
+              </a>
+              {project.repository_url && (
+                <a
+                  href={project.repository_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Open the ${project.name} repository`}
+                  className="inline-flex items-center gap-1.5 rounded font-mono text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Github className="size-3" />
+                  {project.repository_url}
+                </a>
+              )}
+            </div>
           </div>
         </CardHeader>
         {project.allowed_employee_ids.length > 0 && (

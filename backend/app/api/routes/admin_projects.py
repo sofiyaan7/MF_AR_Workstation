@@ -12,8 +12,8 @@ from app.models.project import Category, Project, ProjectOpen
 from app.schemas.activity import ProjectStatsResponse
 from app.schemas.common import Message, Page
 from app.schemas.project import (
-    CategoryCreate, CategoryDetail, CategoryUpdate, ProjectAdminRow, ProjectCreate,
-    ProjectDetail, ProjectUpdate,
+    CategoryCreate, CategoryDetail, CategoryUpdate, ProjectAdminDetail, ProjectAdminRow,
+    ProjectCreate, ProjectUpdate,
 )
 from app.services import analytics_service, project_service
 from app.services.activity_service import record_activity
@@ -36,8 +36,8 @@ def _unique_users(db, project_id: int) -> int:
     ).scalar_one()
 
 
-def _to_detail(db, project: Project) -> ProjectDetail:
-    detail = ProjectDetail.model_validate(project)
+def _to_detail(db, project: Project) -> ProjectAdminDetail:
+    detail = ProjectAdminDetail.model_validate(project)
     detail.unique_users = _unique_users(db, project.id)
     detail.allowed_employee_ids = [p.user.employee_id for p in project.permissions if p.user]
     return detail
@@ -82,8 +82,8 @@ def list_projects(
     return Page(items=items, total=total, limit=limit, offset=offset)
 
 
-@router.post("/projects", response_model=ProjectDetail, status_code=201)
-def create_project(payload: ProjectCreate, admin: AdminUser, db: Db, ctx: Ctx) -> ProjectDetail:
+@router.post("/projects", response_model=ProjectAdminDetail, status_code=201)
+def create_project(payload: ProjectCreate, admin: AdminUser, db: Db, ctx: Ctx) -> ProjectAdminDetail:
     """Add a project. It appears on the dashboard immediately — no code change."""
     if payload.category_id is not None and db.get(Category, payload.category_id) is None:
         raise ValidationError("The selected category does not exist")
@@ -95,6 +95,7 @@ def create_project(payload: ProjectCreate, admin: AdminUser, db: Db, ctx: Ctx) -
         short_description=payload.short_description or (payload.description or "")[:280] or None,
         url=str(payload.url),
         documentation_url=str(payload.documentation_url) if payload.documentation_url else None,
+        repository_url=str(payload.repository_url) if payload.repository_url else None,
         category_id=payload.category_id,
         owner_name=(payload.owner_name or admin.full_name).strip(),
         owner_user_id=payload.owner_user_id,
@@ -136,15 +137,15 @@ def create_project(payload: ProjectCreate, admin: AdminUser, db: Db, ctx: Ctx) -
     return detail
 
 
-@router.get("/projects/{project_id}", response_model=ProjectDetail)
-def get_project(project_id: int, admin: AdminUser, db: Db) -> ProjectDetail:
+@router.get("/projects/{project_id}", response_model=ProjectAdminDetail)
+def get_project(project_id: int, admin: AdminUser, db: Db) -> ProjectAdminDetail:
     return _to_detail(db, _get_project(db, project_id))
 
 
-@router.put("/projects/{project_id}", response_model=ProjectDetail)
+@router.put("/projects/{project_id}", response_model=ProjectAdminDetail)
 def update_project(
     project_id: int, payload: ProjectUpdate, admin: AdminUser, db: Db, ctx: Ctx
-) -> ProjectDetail:
+) -> ProjectAdminDetail:
     project = _get_project(db, project_id)
     changes = payload.model_dump(exclude_unset=True)
     if not changes:
@@ -167,7 +168,7 @@ def update_project(
             project.slug = project_service.unique_slug(
                 db, Project, value, exclude_id=project.id
             )
-        elif field in {"url", "documentation_url"}:
+        elif field in {"url", "documentation_url", "repository_url"}:
             setattr(project, field, str(value) if value else None)
         elif field in {"status", "visibility"}:
             setattr(project, field, str(value))
@@ -207,8 +208,8 @@ def update_project(
     return _to_detail(db, project)
 
 
-@router.post("/projects/{project_id}/duplicate", response_model=ProjectDetail, status_code=201)
-def duplicate_project(project_id: int, admin: AdminUser, db: Db, ctx: Ctx) -> ProjectDetail:
+@router.post("/projects/{project_id}/duplicate", response_model=ProjectAdminDetail, status_code=201)
+def duplicate_project(project_id: int, admin: AdminUser, db: Db, ctx: Ctx) -> ProjectAdminDetail:
     """Copy a project as an inactive draft, so the original keeps its stats."""
     source = _get_project(db, project_id)
     name = f"{source.name} (Copy)"
@@ -219,6 +220,7 @@ def duplicate_project(project_id: int, admin: AdminUser, db: Db, ctx: Ctx) -> Pr
         short_description=source.short_description,
         url=source.url,
         documentation_url=source.documentation_url,
+        repository_url=source.repository_url,
         category_id=source.category_id,
         owner_name=source.owner_name,
         owner_user_id=source.owner_user_id,
@@ -270,8 +272,8 @@ def delete_project(project_id: int, admin: AdminUser, db: Db, ctx: Ctx) -> Messa
     )
 
 
-@router.post("/projects/{project_id}/restore", response_model=ProjectDetail)
-def restore_project(project_id: int, admin: AdminUser, db: Db, ctx: Ctx) -> ProjectDetail:
+@router.post("/projects/{project_id}/restore", response_model=ProjectAdminDetail)
+def restore_project(project_id: int, admin: AdminUser, db: Db, ctx: Ctx) -> ProjectAdminDetail:
     project = _get_project(db, project_id)
     project.is_deleted = False
     project.is_active = True

@@ -111,6 +111,12 @@ export interface ProjectAdminRow extends ProjectCard {
   is_deleted: boolean;
   unique_users: number;
   sort_order: number;
+  repository_url: string | null;
+}
+
+/** ProjectDetail plus admin-only fields; the employee route returns ProjectDetail. */
+export interface ProjectAdminDetail extends ProjectDetail {
+  repository_url: string | null;
 }
 
 export interface RecentProject {
@@ -243,6 +249,7 @@ export interface ProjectFormValues {
   description?: string | null;
   short_description?: string | null;
   documentation_url?: string | null;
+  repository_url?: string | null;
   category_id?: number | null;
   tags: string[];
   owner_name?: string | null;

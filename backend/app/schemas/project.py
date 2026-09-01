@@ -94,6 +94,17 @@ class ProjectAdminRow(ProjectCard):
     is_deleted: bool
     unique_users: int = 0
     sort_order: int
+    repository_url: str | None = None
+
+
+class ProjectAdminDetail(ProjectDetail):
+    """ProjectDetail plus admin-only fields.
+
+    ``ProjectDetail`` is also returned by the employee route, so the repository
+    link lives here instead: internal source URLs stay inside the admin console.
+    """
+
+    repository_url: str | None = None
 
 
 class ProjectCreate(BaseModel):
@@ -102,6 +113,7 @@ class ProjectCreate(BaseModel):
     description: str | None = Field(default=None, max_length=5000)
     short_description: str | None = Field(default=None, max_length=280)
     documentation_url: HttpUrl | None = None
+    repository_url: HttpUrl | None = None
     category_id: int | None = None
     tags: list[str] = Field(default_factory=list, max_length=20)
     owner_name: str | None = Field(default=None, max_length=160)
@@ -117,7 +129,7 @@ class ProjectCreate(BaseModel):
     sort_order: int = 0
     is_active: bool = True
 
-    @field_validator("url", "documentation_url")
+    @field_validator("url", "documentation_url", "repository_url")
     @classmethod
     def _http_only(cls, v: HttpUrl | None) -> HttpUrl | None:
         # Blocks javascript:, data: and other schemes that would be XSS vectors
@@ -138,6 +150,7 @@ class ProjectUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=5000)
     short_description: str | None = Field(default=None, max_length=280)
     documentation_url: HttpUrl | None = None
+    repository_url: HttpUrl | None = None
     category_id: int | None = None
     tags: list[str] | None = Field(default=None, max_length=20)
     owner_name: str | None = Field(default=None, max_length=160)
@@ -153,7 +166,7 @@ class ProjectUpdate(BaseModel):
     sort_order: int | None = None
     is_active: bool | None = None
 
-    @field_validator("url", "documentation_url")
+    @field_validator("url", "documentation_url", "repository_url")
     @classmethod
     def _http_only(cls, v: HttpUrl | None) -> HttpUrl | None:
         if v is not None and v.scheme not in {"http", "https"}:

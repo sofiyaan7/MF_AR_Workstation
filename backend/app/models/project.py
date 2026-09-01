@@ -65,6 +65,9 @@ class Project(Base, TimestampMixin, SoftDeleteMixin):
     short_description: Mapped[str | None] = mapped_column(String(280))
     url: Mapped[str] = mapped_column(String(1024), nullable=False)
     documentation_url: Mapped[str | None] = mapped_column(String(1024))
+    # Source repository (GitHub or similar). Admin-only: surfaced in the admin
+    # console, deliberately not on the employee-facing schemas.
+    repository_url: Mapped[str | None] = mapped_column(String(1024))
 
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
