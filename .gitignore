@@ -44,5 +44,10 @@ logs/
 
 # TypeScript build info
 *.tsbuildinfo
-.vercel
-.env*
+.vercel/
+.env*.local
+
+# Agent tooling (Vercel plugin) - local only
+.agents/
+.claude/
+skills-lock.json
