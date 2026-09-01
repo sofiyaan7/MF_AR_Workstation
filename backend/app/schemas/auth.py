@@ -5,7 +5,8 @@ from app.schemas.user import UserProfile
 
 
 class LoginRequest(BaseModel):
-    employee_id: str = Field(min_length=1, max_length=64, examples=["ARWL12345"])
+    # The sign-in name is the person's full name, not their employee ID.
+    username: str = Field(min_length=1, max_length=160, examples=["Sofiyaan Sameer"])
     password: str = Field(min_length=1, max_length=128)
     remember_me: bool = False
 
@@ -29,4 +30,5 @@ class PasswordPolicyResponse(BaseModel):
 
 
 class ForgotPasswordRequest(BaseModel):
-    employee_id: str = Field(min_length=1, max_length=64)
+    # Matches the sign-in form, which now collects the full name.
+    username: str = Field(min_length=1, max_length=160)

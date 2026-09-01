@@ -27,7 +27,7 @@ def test_search_is_not_vulnerable_to_sql_injection(as_employee, db, project, pay
 def test_injection_in_login_is_handled_safely(client, db, employee):
     response = client.post(
         "/api/auth/login",
-        json={"employee_id": "' OR 1=1 --", "password": "' OR 1=1 --"},
+        json={"username": "' OR 1=1 --", "password": "' OR 1=1 --"},
     )
     assert response.status_code == 401
     assert db.execute(select(User)).scalars().all()
@@ -93,7 +93,7 @@ def test_logs_do_not_contain_passwords(client, employee, caplog):
     with caplog.at_level(logging.DEBUG):
         client.post(
             "/api/auth/login",
-            json={"employee_id": employee.employee_id, "password": "SuperSecret123!"},
+            json={"username": employee.full_name, "password": "SuperSecret123!"},
         )
     combined = "\n".join(record.getMessage() for record in caplog.records)
     assert "SuperSecret123!" not in combined

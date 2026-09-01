@@ -47,7 +47,7 @@ def test_employee_cannot_create_a_category(as_employee):
 
 
 def test_category_counts_exclude_hidden_projects(client, admin_user, employee, category):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     admin.post(
         "/api/admin/projects",
         json={
@@ -59,5 +59,5 @@ def test_category_counts_exclude_hidden_projects(client, admin_user, employee, c
     )
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     assert staff.get("/api/projects").json()["total"] == 0

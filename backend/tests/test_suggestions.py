@@ -22,7 +22,7 @@ def test_the_log_is_shared_between_users(as_employee, client, other_employee, pr
     _create(as_employee, project.id, title="Raised by the first employee")
 
     # A different employee sees it: the log is deliberately not private.
-    as_other = login(client, other_employee.employee_id)
+    as_other = login(client, other_employee.full_name)
     listing = as_other.get(f"/api/projects/{project.id}/suggestions")
     assert listing.status_code == 200
     titles = [item["title"] for item in listing.json()["items"]]
@@ -60,17 +60,32 @@ def test_status_filter_does_not_change_the_counts(as_employee, as_admin, project
     assert filtered["counts"] == {"open": 1, "closed": 1, "total": 2}
 
 
-def test_author_can_close_and_reopen_their_own(as_employee, project):
+def test_author_cannot_close_their_own(as_employee, project):
+    """Triage belongs to admins; the requester does not close their own request."""
     created = _create(as_employee, project.id).json()
-    assert created["can_manage"] is True
+    assert created["can_manage"] is False
 
-    closed = as_employee.patch(
+    response = as_employee.patch(
+        f"/api/projects/{project.id}/suggestions/{created['id']}", json={"status": "CLOSED"}
+    )
+    assert response.status_code == 403
+
+
+def test_admin_can_close_and_reopen(as_employee, as_admin, project):
+    created = _create(as_employee, project.id).json()
+
+    closed = as_admin.patch(
         f"/api/projects/{project.id}/suggestions/{created['id']}", json={"status": "CLOSED"}
     )
     assert closed.status_code == 200
     assert closed.json()["closed_by"]["employee_id"]
 
-    reopened = as_employee.patch(
+    # Closed suggestions stay in the log — history is never removed.
+    listing = as_employee.get(f"/api/projects/{project.id}/suggestions").json()
+    assert [i["id"] for i in listing["items"]] == [created["id"]]
+    assert listing["counts"] == {"open": 0, "closed": 1, "total": 1}
+
+    reopened = as_admin.patch(
         f"/api/projects/{project.id}/suggestions/{created['id']}", json={"status": "OPEN"}
     )
     assert reopened.status_code == 200
@@ -79,11 +94,9 @@ def test_author_can_close_and_reopen_their_own(as_employee, project):
     assert reopened.json()["closed_by"] is None
 
 
-def test_another_employee_cannot_close_someone_elses(
-    as_employee, client, other_employee, project
-):
+def test_a_non_admin_employee_cannot_close(as_employee, client, other_employee, project):
     created = _create(as_employee, project.id).json()
-    as_other = login(client, other_employee.employee_id)
+    as_other = login(client, other_employee.full_name)
 
     listing = as_other.get(f"/api/projects/{project.id}/suggestions").json()
     assert listing["items"][0]["can_manage"] is False

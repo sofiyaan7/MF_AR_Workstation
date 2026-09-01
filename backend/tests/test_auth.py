@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.models.enums import AccountStatus, EventType
+from app.models.enums import AccountStatus, EventType, RoleName
 from app.models.activity import ActivityLog
 from app.models.user import LoginAttempt, Session, User
 from tests.conftest import TEST_PASSWORD, login
@@ -12,7 +12,7 @@ from tests.conftest import TEST_PASSWORD, login
 def test_login_success_sets_cookies_and_profile(client, employee):
     response = client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": TEST_PASSWORD},
+        json={"username": employee.full_name, "password": TEST_PASSWORD},
     )
     assert response.status_code == 200
     body = response.json()
@@ -27,7 +27,7 @@ def test_login_success_sets_cookies_and_profile(client, employee):
 def test_login_response_never_exposes_password_hash(client, employee):
     response = client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": TEST_PASSWORD},
+        json={"username": employee.full_name, "password": TEST_PASSWORD},
     )
     assert "password_hash" not in response.text
     assert "$argon2" not in response.text
@@ -36,7 +36,7 @@ def test_login_response_never_exposes_password_hash(client, employee):
 def test_login_wrong_password_rejected(client, employee):
     response = client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": "WrongPassword1!"},
+        json={"username": employee.full_name, "password": "WrongPassword1!"},
     )
     assert response.status_code == 401
     assert response.json()["message"] == "Invalid Employee ID or password"
@@ -45,7 +45,7 @@ def test_login_wrong_password_rejected(client, employee):
 def test_login_unknown_employee_id_gives_identical_error(client, employee):
     response = client.post(
         "/api/auth/login",
-        json={"employee_id": "NOT-A-REAL-ID", "password": TEST_PASSWORD},
+        json={"username": "NOT-A-REAL-ID", "password": TEST_PASSWORD},
     )
     assert response.status_code == 401
     # Identical wording prevents employee-ID enumeration.
@@ -55,7 +55,7 @@ def test_login_unknown_employee_id_gives_identical_error(client, employee):
 def test_only_authorized_employees_can_log_in(client, db, roles):
     """An Employee ID that an administrator never added cannot sign in."""
     response = client.post(
-        "/api/auth/login", json={"employee_id": "ARWL99999", "password": TEST_PASSWORD}
+        "/api/auth/login", json={"username": "ARWL99999", "password": TEST_PASSWORD}
     )
     assert response.status_code == 401
     assert db.execute(
@@ -71,7 +71,7 @@ def test_disabled_user_cannot_log_in(client, db, roles):
         status=AccountStatus.DISABLED, is_active=False,
     )
     response = client.post(
-        "/api/auth/login", json={"employee_id": user.employee_id, "password": TEST_PASSWORD}
+        "/api/auth/login", json={"username": user.full_name, "password": TEST_PASSWORD}
     )
     assert response.status_code == 401
     assert "not active" in response.json()["message"]
@@ -81,11 +81,11 @@ def test_account_locks_after_repeated_failures(client, db, employee):
     for _ in range(settings.MAX_FAILED_LOGIN_ATTEMPTS - 1):
         client.post(
             "/api/auth/login",
-            json={"employee_id": employee.employee_id, "password": "Wrong1!Password"},
+            json={"username": employee.full_name, "password": "Wrong1!Password"},
         )
     final = client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": "Wrong1!Password"},
+        json={"username": employee.full_name, "password": "Wrong1!Password"},
     )
     assert final.status_code == 423
     assert "locked" in final.json()["message"].lower()
@@ -93,7 +93,7 @@ def test_account_locks_after_repeated_failures(client, db, employee):
     # Even the correct password is refused while locked.
     correct = client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": TEST_PASSWORD},
+        json={"username": employee.full_name, "password": TEST_PASSWORD},
     )
     assert correct.status_code == 423
 
@@ -106,7 +106,7 @@ def test_account_locks_after_repeated_failures(client, db, employee):
 def test_failed_logins_are_recorded(client, db, employee):
     client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": "Wrong1!Password"},
+        json={"username": employee.full_name, "password": "Wrong1!Password"},
     )
     attempts = db.execute(select(LoginAttempt)).scalars().all()
     assert len(attempts) == 1
@@ -121,7 +121,7 @@ def test_failed_logins_are_recorded(client, db, employee):
 
 
 def test_successful_login_is_audited_and_counted(client, db, employee):
-    login(client, employee.employee_id)
+    login(client, employee.full_name)
     db.expire_all()
     refreshed = db.get(User, employee.id)
     assert refreshed.login_count == 1
@@ -145,7 +145,7 @@ def test_me_returns_signed_in_user(as_employee, employee):
 
 
 def test_logout_revokes_the_session(client, db, employee):
-    api = login(client, employee.employee_id)
+    api = login(client, employee.full_name)
     assert api.post("/api/auth/logout").status_code == 200
 
     sessions = db.execute(select(Session)).scalars().all()
@@ -154,7 +154,7 @@ def test_logout_revokes_the_session(client, db, employee):
 
 
 def test_refresh_rotates_the_token(client, db, employee):
-    login(client, employee.employee_id)
+    login(client, employee.full_name)
     first_refresh = client.cookies.get(settings.REFRESH_COOKIE_NAME)
 
     response = client.post("/api/auth/refresh")
@@ -169,7 +169,7 @@ def test_refresh_rotates_the_token(client, db, employee):
 
 def test_revoked_refresh_token_cannot_be_reused(client, employee):
     """Rotation means a captured refresh token is dead after the next refresh."""
-    login(client, employee.employee_id)
+    login(client, employee.full_name)
     stolen = client.cookies.get(settings.REFRESH_COOKIE_NAME)
     client.post("/api/auth/refresh")
 
@@ -199,7 +199,7 @@ def test_access_token_forged_with_another_key_is_rejected(client, employee):
 
 
 def test_change_password_succeeds_and_new_password_works(client, employee):
-    api = login(client, employee.employee_id)
+    api = login(client, employee.full_name)
     new_password = "Br@ndNewPass99"
     response = api.post(
         "/api/auth/change-password",
@@ -214,11 +214,11 @@ def test_change_password_succeeds_and_new_password_works(client, employee):
     api.post("/api/auth/logout")
     assert client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": new_password},
+        json={"username": employee.full_name, "password": new_password},
     ).status_code == 200
     assert client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": TEST_PASSWORD},
+        json={"username": employee.full_name, "password": TEST_PASSWORD},
     ).status_code == 401
 
 
@@ -279,7 +279,7 @@ def test_change_password_blocks_reuse(as_employee):
 
 
 def test_password_change_is_audited(client, db, employee):
-    api = login(client, employee.employee_id)
+    api = login(client, employee.full_name)
     api.post(
         "/api/auth/change-password",
         json={
@@ -294,11 +294,11 @@ def test_password_change_is_audited(client, db, employee):
     assert len(logs) == 1 and logs[0].success is True
 
 
-def test_forgot_password_does_not_reveal_whether_the_id_exists(client, employee):
+def test_forgot_password_does_not_reveal_whether_the_name_exists(client, employee):
     known = client.post(
-        "/api/auth/forgot-password", json={"employee_id": employee.employee_id}
+        "/api/auth/forgot-password", json={"username": employee.full_name}
     )
-    unknown = client.post("/api/auth/forgot-password", json={"employee_id": "NOPE123"})
+    unknown = client.post("/api/auth/forgot-password", json={"username": "Nobody At All"})
     assert known.status_code == unknown.status_code == 202
     assert known.json() == unknown.json()
 
@@ -310,7 +310,7 @@ def test_password_policy_endpoint_is_public(client):
 
 
 def test_csrf_token_required_for_cookie_state_changes(client, employee):
-    login(client, employee.employee_id)  # cookies set, but no CSRF header sent below
+    login(client, employee.full_name)  # cookies set, but no CSRF header sent below
     response = client.post(
         "/api/auth/change-password",
         json={
@@ -328,3 +328,71 @@ def test_security_headers_present(client):
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
     assert "Content-Security-Policy" in response.headers
+
+
+def test_sign_in_uses_the_full_name_not_the_employee_id(client, employee):
+    """The username is the person's name; the employee ID is no longer a credential."""
+    by_name = client.post(
+        "/api/auth/login", json={"username": employee.full_name, "password": TEST_PASSWORD}
+    )
+    assert by_name.status_code == 200
+
+    by_id = client.post(
+        "/api/auth/login", json={"username": employee.employee_id, "password": TEST_PASSWORD}
+    )
+    assert by_id.status_code == 401
+
+
+def test_name_matching_ignores_case_and_extra_spacing(client, employee):
+    response = client.post(
+        "/api/auth/login",
+        json={"username": f"  {employee.full_name.upper()}  ", "password": TEST_PASSWORD},
+    )
+    assert response.status_code == 200
+
+
+def test_a_deleted_namesake_does_not_block_sign_in(client, db, roles, employee):
+    """One live account and one deleted namesake still resolves to the live one."""
+    from tests.conftest import _make_user
+
+    ghost = _make_user(db, roles, "ARWL90001", employee.full_name, RoleName.USER)
+    ghost.is_deleted = True
+    db.commit()
+
+    response = client.post(
+        "/api/auth/login", json={"username": employee.full_name, "password": TEST_PASSWORD}
+    )
+    assert response.status_code == 200
+
+
+def test_two_sign_in_able_namesakes_are_refused_rather_than_guessed(client, db, roles, employee):
+    """Signing one of two namesakes in would be signing them into the wrong account."""
+    from tests.conftest import _make_user
+
+    _make_user(db, roles, "ARWL90002", employee.full_name, RoleName.USER)
+    db.commit()
+
+    response = client.post(
+        "/api/auth/login", json={"username": employee.full_name, "password": TEST_PASSWORD}
+    )
+    assert response.status_code == 401
+    # The generic message must not hint that the name matched several accounts.
+    assert "Invalid" in response.json()["message"]
+
+
+def test_duplicate_sign_in_names_are_rejected_at_creation(client, admin_user, employee):
+    from tests.conftest import login as sign_in
+
+    admin = sign_in(client, admin_user.full_name)
+    response = admin.post(
+        "/api/admin/users",
+        json={
+            "employee_id": "ARWL90003",
+            "full_name": employee.full_name.lower(),
+            "email": "namesake@example.com",
+            "role": "USER",
+            "status": "ACTIVE",
+        },
+    )
+    assert response.status_code == 409
+    assert "sign-in name" in response.json()["message"]

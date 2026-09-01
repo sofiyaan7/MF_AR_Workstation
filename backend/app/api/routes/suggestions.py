@@ -2,7 +2,9 @@
 
 Any employee who can see a project may raise a suggestion against it and read
 every suggestion on it — the log is shared on purpose. Closing and reopening is
-restricted to the author and to admins, so the status column stays meaningful.
+restricted to admins and super admins: triage is an ownership decision, not
+something the requester makes about their own request. Closed suggestions stay
+in the log as history; nothing is ever removed.
 """
 from typing import Annotated
 
@@ -24,9 +26,9 @@ from app.services.activity_service import record_activity, touch_last_activity
 router = APIRouter(prefix="/projects", tags=["Suggestions"])
 
 
-def _can_manage(user, suggestion: Suggestion) -> bool:
-    """Authors close their own; admins close anyone's."""
-    return bool(user.is_admin or (suggestion.user_id and suggestion.user_id == user.id))
+def _can_manage(user, _suggestion: Suggestion) -> bool:
+    """Only admins and super admins triage. Authors cannot close their own."""
+    return bool(user.is_admin)
 
 
 def _to_read(user, suggestion: Suggestion) -> SuggestionRead:
@@ -115,7 +117,7 @@ def set_suggestion_status(
     suggestion = _get_for_project(db, user, project_id, suggestion_id)
     if not _can_manage(user, suggestion):
         raise PermissionDeniedError(
-            "Only the person who raised this suggestion, or an administrator, can change it"
+            "Only an administrator can close or reopen a suggestion"
         )
 
     target = str(payload.status)

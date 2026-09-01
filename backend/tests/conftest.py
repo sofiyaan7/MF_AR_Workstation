@@ -189,9 +189,10 @@ class ApiClient:
         return self.client.delete(url, headers=self._headers(kw.pop("headers", None)), **kw)
 
 
-def login(client: TestClient, employee_id: str, password: str = TEST_PASSWORD) -> ApiClient:
+def login(client: TestClient, username: str, password: str = TEST_PASSWORD) -> ApiClient:
+    """Sign in by full name, which is the portal's username."""
     response = client.post(
-        "/api/auth/login", json={"employee_id": employee_id, "password": password}
+        "/api/auth/login", json={"username": username, "password": password}
     )
     assert response.status_code == 200, response.text
     return ApiClient(client, response.json()["csrf_token"])
@@ -199,9 +200,9 @@ def login(client: TestClient, employee_id: str, password: str = TEST_PASSWORD) -
 
 @pytest.fixture
 def as_admin(client, admin_user) -> ApiClient:
-    return login(client, admin_user.employee_id)
+    return login(client, admin_user.full_name)
 
 
 @pytest.fixture
 def as_employee(client, employee) -> ApiClient:
-    return login(client, employee.employee_id)
+    return login(client, employee.full_name)

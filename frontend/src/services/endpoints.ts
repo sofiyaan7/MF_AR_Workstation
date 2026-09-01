@@ -12,8 +12,8 @@ import type {
 // Auth
 // --------------------------------------------------------------------------
 export const authApi = {
-  login: (employee_id: string, password: string) =>
-    unwrap<LoginResponse>(api.post("/auth/login", { employee_id, password })),
+  login: (username: string, password: string) =>
+    unwrap<LoginResponse>(api.post("/auth/login", { username, password })),
   logout: () => unwrap<ApiMessage>(api.post("/auth/logout")),
   me: () => unwrap<UserProfile>(api.get("/auth/me")),
   updateProfile: (payload: { full_name?: string; email?: string; phone?: string }) =>
@@ -25,8 +25,8 @@ export const authApi = {
   }) => unwrap<ApiMessage>(api.post("/auth/change-password", payload)),
   passwordPolicy: () =>
     unwrap<{ min_length: number; requirements: string[] }>(api.get("/auth/password-policy")),
-  forgotPassword: (employee_id: string) =>
-    unwrap<ApiMessage>(api.post("/auth/forgot-password", { employee_id })),
+  forgotPassword: (username: string) =>
+    unwrap<ApiMessage>(api.post("/auth/forgot-password", { username })),
 };
 
 // --------------------------------------------------------------------------

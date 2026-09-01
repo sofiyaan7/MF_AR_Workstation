@@ -22,7 +22,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, response: Response, db: Db, ctx: Ctx) -> LoginResponse:
     """Exchange Employee ID + password for an authenticated session."""
-    user = auth_service.authenticate(db, payload.employee_id, payload.password, ctx)
+    user = auth_service.authenticate(db, payload.username, payload.password, ctx)
     access, refresh, csrf = auth_service.issue_session(db, user, ctx)
     set_auth_cookies(response, access, refresh, csrf)
     return LoginResponse(
@@ -142,14 +142,16 @@ def forgot_password(payload: ForgotPasswordRequest, db: Db, ctx: Ctx) -> Message
     No email transport is configured in this deployment, so the portal
     deliberately does not send a reset link. The request is audited and an
     administrator issues a temporary password from the admin panel. The
-    response is identical whether or not the Employee ID exists.
+    response is identical whether or not the name matches an account.
     """
-    user = auth_service.get_user_by_employee_id(db, payload.employee_id)
+    resolved = auth_service.get_user_by_username(db, payload.username)
+    # Namesakes resolve to a list; for an audit line "somebody asked" is enough.
+    user = None if isinstance(resolved, list) else resolved
     record_activity(
         db,
         event_type=EventType.PASSWORD_RESET,
         user=user,
-        employee_id=payload.employee_id.strip(),
+        employee_id=payload.username.strip(),
         description="Password reset requested via the sign-in page",
         success=user is not None,
         context=ctx,

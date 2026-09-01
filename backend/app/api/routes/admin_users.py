@@ -21,6 +21,22 @@ from app.services.activity_service import record_activity
 router = APIRouter(prefix="/admin/users", tags=["Admin - Users"])
 
 
+def _reject_duplicate_name(db, full_name: str, *, exclude_id: int | None = None) -> None:
+    """Full names are sign-in credentials now, so they have to be unique.
+
+    Compared on the same normalised form authentication uses, and scoped to
+    accounts that are not deleted — a namesake who has left should not block a
+    new joiner.
+    """
+    wanted = auth_service.normalise_name(full_name)
+    for other in db.execute(select(User).where(User.is_deleted.is_(False))).scalars().unique():
+        if other.id != exclude_id and auth_service.normalise_name(other.full_name) == wanted:
+            raise ConflictError(
+                f"'{full_name.strip()}' is already the sign-in name for another account. "
+                "Names are used to sign in, so they must be unique."
+            )
+
+
 def _get_role(db, name: str) -> Role:
     role = db.execute(select(Role).where(Role.name == str(name))).scalars().first()
     if role is None:
@@ -128,6 +144,7 @@ def create_user(payload: UserCreate, admin: AdminUser, db: Db, ctx: Ctx) -> User
         select(User.id).where(func.lower(User.email) == payload.email.lower())
     ).first():
         raise ConflictError(f"Email '{payload.email}' is already registered")
+    _reject_duplicate_name(db, payload.full_name)
 
     temp_password = payload.temporary_password or security.generate_temp_password()
     role = _get_role(db, payload.role)
@@ -195,6 +212,8 @@ def update_user(
     else:
         _guard_target(admin, user, "update")
 
+    if "full_name" in changes and changes["full_name"]:
+        _reject_duplicate_name(db, changes["full_name"], exclude_id=user.id)
     if "email" in changes and changes["email"]:
         clash = db.execute(
             select(User.id).where(

@@ -83,11 +83,11 @@ def test_employee_cannot_read_another_users_activity(as_employee, other_employee
 
 def test_my_activity_only_returns_own_events(client, db, employee, other_employee, project):
     """Two users act; each must see only their own history."""
-    mine = login(client, employee.employee_id)
+    mine = login(client, employee.full_name)
     mine.post(f"/api/projects/{project.id}/open")
     mine.post("/api/auth/logout")
 
-    theirs = login(client, other_employee.employee_id)
+    theirs = login(client, other_employee.full_name)
     theirs.post(f"/api/projects/{project.id}/open")
 
     response = theirs.get("/api/activity/me")
@@ -108,11 +108,11 @@ def test_my_activity_ignores_a_user_id_supplied_by_the_client(
     client, employee, other_employee, project
 ):
     """A crafted query parameter must not widen the scope."""
-    theirs = login(client, other_employee.employee_id)
+    theirs = login(client, other_employee.full_name)
     theirs.post(f"/api/projects/{project.id}/open")
     theirs.post("/api/auth/logout")
 
-    mine = login(client, employee.employee_id)
+    mine = login(client, employee.full_name)
     response = mine.get(f"/api/activity/me?user_id={other_employee.id}&employee_id=ARWL12346")
     assert response.status_code == 200
     assert other_employee.full_name not in response.text
@@ -129,14 +129,14 @@ def test_denied_admin_access_is_audited(as_employee, db, employee):
 
 
 def test_plain_admin_cannot_modify_a_super_admin(client, plain_admin, admin_user):
-    api = login(client, plain_admin.employee_id)
+    api = login(client, plain_admin.full_name)
     response = api.put(f"/api/admin/users/{admin_user.id}", json={"role": "USER"})
     assert response.status_code == 403
     assert "super administrator" in response.json()["message"].lower()
 
 
 def test_plain_admin_cannot_create_a_super_admin(client, plain_admin):
-    api = login(client, plain_admin.employee_id)
+    api = login(client, plain_admin.full_name)
     response = api.post(
         "/api/admin/users",
         json={
@@ -162,13 +162,13 @@ def test_admin_can_reach_admin_endpoints(as_admin):
 
 def test_disabled_user_token_stops_working_immediately(client, db, employee, admin_user):
     """A live session must die the moment the account is disabled."""
-    victim = login(client, employee.employee_id)
+    victim = login(client, employee.full_name)
     assert victim.get("/api/auth/me").status_code == 200
     victim_csrf = victim.csrf
     victim_cookies = dict(client.cookies)
 
     client.cookies.clear()
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     assert admin.post(f"/api/admin/users/{employee.id}/disable").status_code == 200
 
     client.cookies.clear()

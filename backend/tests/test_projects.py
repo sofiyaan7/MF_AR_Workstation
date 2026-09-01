@@ -29,14 +29,14 @@ def _create_project(api, **overrides) -> dict:
 # Creation appears on the dashboard with no code change
 # --------------------------------------------------------------------------
 def test_admin_creates_project_and_it_appears_for_employees(client, admin_user, employee, category):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     created = _create_project(admin, category_id=category.id)
     assert created["name"] == "MSCI August Review"
     assert created["slug"] == "msci-august-review"
     assert {t["name"] for t in created["tags"]} == {"MSCI", "Research", "Backtesting"}
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     listed = staff.get("/api/projects").json()
     assert created["id"] in [p["id"] for p in listed["items"]]
 
@@ -45,7 +45,7 @@ def test_admin_creates_project_and_it_appears_for_employees(client, admin_user, 
 
 
 def test_created_project_records_who_created_it(client, admin_user, category):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     created = _create_project(admin, category_id=category.id)
     assert created["created_by_id"] == admin_user.id
 
@@ -54,7 +54,7 @@ def test_created_project_records_who_created_it(client, admin_user, category):
 
 
 def test_project_creation_is_audited(client, db, admin_user, category):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     created = _create_project(admin, category_id=category.id)
     log = db.execute(
         select(ActivityLog).where(ActivityLog.event_type == EventType.PROJECT_CREATED)
@@ -98,7 +98,7 @@ def test_edit_is_audited_with_the_editor(as_admin, db, project, admin_user):
 
 
 def test_delete_is_soft_and_hides_the_project(client, db, admin_user, employee, project):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     assert admin.delete(f"/api/admin/projects/{project.id}").status_code == 200
     admin.post("/api/auth/logout")
 
@@ -106,17 +106,17 @@ def test_delete_is_soft_and_hides_the_project(client, db, admin_user, employee, 
     stored = db.get(Project, project.id)
     assert stored is not None and stored.is_deleted is True
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     assert staff.get("/api/projects").json()["items"] == []
     assert staff.get(f"/api/projects/{project.id}").status_code == 404
 
 
 def test_activity_history_survives_project_deletion(client, db, admin_user, employee, project):
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     staff.post(f"/api/projects/{project.id}/open")
     staff.post("/api/auth/logout")
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     admin.delete(f"/api/admin/projects/{project.id}")
 
     activity = admin.get("/api/admin/activity?event_type=PROJECT_OPENED").json()
@@ -145,14 +145,14 @@ def test_duplicate_creates_an_inactive_copy(as_admin, project):
 # Visibility — enforced by the backend, not by hiding in the UI
 # --------------------------------------------------------------------------
 def test_admin_only_project_is_invisible_to_employees(client, admin_user, employee):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     created = _create_project(
         admin, name="Risk Limits Console", visibility="ADMIN_ONLY",
         url="https://example.internal/risk",
     )
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     assert created["id"] not in [p["id"] for p in staff.get("/api/projects").json()["items"]]
     # Direct fetch is refused too, and does not confirm the project exists.
     assert staff.get(f"/api/projects/{created['id']}").status_code == 404
@@ -162,7 +162,7 @@ def test_admin_only_project_is_invisible_to_employees(client, admin_user, employ
 def test_specific_employees_visibility_grants_only_named_ids(
     client, admin_user, employee, other_employee
 ):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     created = _create_project(
         admin,
         name="Sector Rotation Model",
@@ -172,52 +172,52 @@ def test_specific_employees_visibility_grants_only_named_ids(
     )
     admin.post("/api/auth/logout")
 
-    permitted = login(client, employee.employee_id)
+    permitted = login(client, employee.full_name)
     assert created["id"] in [p["id"] for p in permitted.get("/api/projects").json()["items"]]
     assert permitted.get(f"/api/projects/{created['id']}").status_code == 200
     permitted.post("/api/auth/logout")
 
-    excluded = login(client, other_employee.employee_id)
+    excluded = login(client, other_employee.full_name)
     assert created["id"] not in [p["id"] for p in excluded.get("/api/projects").json()["items"]]
     assert excluded.get(f"/api/projects/{created['id']}").status_code == 404
 
 
 def test_department_restriction_is_enforced(client, admin_user, employee, other_employee):
     """employee is in Research; other_employee is in Portfolio."""
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     created = _create_project(
         admin, name="Research Only Tool", url="https://example.internal/research-only",
         allowed_departments=["Research"],
     )
     admin.post("/api/auth/logout")
 
-    in_dept = login(client, employee.employee_id)
+    in_dept = login(client, employee.full_name)
     assert in_dept.get(f"/api/projects/{created['id']}").status_code == 200
     in_dept.post("/api/auth/logout")
 
-    out_of_dept = login(client, other_employee.employee_id)
+    out_of_dept = login(client, other_employee.full_name)
     assert out_of_dept.get(f"/api/projects/{created['id']}").status_code == 404
 
 
 def test_visibility_change_takes_effect_immediately(client, admin_user, employee, project):
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     assert staff.get(f"/api/projects/{project.id}").status_code == 200
     staff.post("/api/auth/logout")
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     admin.put(f"/api/admin/projects/{project.id}", json={"visibility": "ADMIN_ONLY"})
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     assert staff.get(f"/api/projects/{project.id}").status_code == 404
 
 
 def test_inactive_project_is_hidden_from_employees(client, admin_user, employee, project):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     admin.put(f"/api/admin/projects/{project.id}", json={"is_active": False})
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     assert staff.get("/api/projects").json()["items"] == []
 
 
@@ -253,22 +253,22 @@ def test_open_appears_in_recently_used(as_employee, project):
 
 
 def test_recently_used_is_per_user(client, employee, other_employee, project):
-    mine = login(client, employee.employee_id)
+    mine = login(client, employee.full_name)
     mine.post(f"/api/projects/{project.id}/open")
     mine.post("/api/auth/logout")
 
-    theirs = login(client, other_employee.employee_id)
+    theirs = login(client, other_employee.full_name)
     assert theirs.get("/api/projects/recent").json() == []
 
 
 def test_coming_soon_project_cannot_be_opened(client, admin_user, employee):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     created = _create_project(
         admin, name="Future Tool", url="https://example.internal/future", status="COMING_SOON"
     )
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     response = staff.post(f"/api/projects/{created['id']}/open")
     assert response.status_code == 403
 
@@ -289,11 +289,11 @@ def test_favourite_and_unfavourite(as_employee, db, employee, project):
 
 
 def test_favourites_are_per_user(client, employee, other_employee, project):
-    mine = login(client, employee.employee_id)
+    mine = login(client, employee.full_name)
     mine.post(f"/api/projects/{project.id}/favourite")
     mine.post("/api/auth/logout")
 
-    theirs = login(client, other_employee.employee_id)
+    theirs = login(client, other_employee.full_name)
     assert theirs.get("/api/projects/favourites").json() == []
     assert theirs.get("/api/projects").json()["items"][0]["is_favourite"] is False
 
@@ -317,13 +317,13 @@ def test_favouriting_is_audited(as_employee, db, project):
 
 
 def test_cannot_favourite_a_project_you_cannot_see(client, admin_user, employee):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     created = _create_project(
         admin, name="Hidden", url="https://example.internal/hidden", visibility="ADMIN_ONLY"
     )
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     assert staff.post(f"/api/projects/{created['id']}/favourite").status_code == 404
 
 
@@ -331,7 +331,7 @@ def test_cannot_favourite_a_project_you_cannot_see(client, admin_user, employee)
 # Search / filter / sort
 # --------------------------------------------------------------------------
 def test_search_matches_name_description_tag_and_owner(client, admin_user, employee, category):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     _create_project(admin, name="MSCI August Review", category_id=category.id)
     _create_project(
         admin, name="Portfolio Audit", url="https://example.internal/audit",
@@ -340,7 +340,7 @@ def test_search_matches_name_description_tag_and_owner(client, admin_user, emplo
     )
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     assert staff.get("/api/projects?search=MSCI").json()["total"] == 1
     assert staff.get("/api/projects?search=portfolio").json()["total"] == 1
     assert staff.get("/api/projects?search=Backtesting").json()["total"] == 1  # tag
@@ -354,7 +354,7 @@ def test_search_is_case_insensitive(as_employee, project):
 
 
 def test_filter_by_category_and_status(client, admin_user, employee, category):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     _create_project(admin, category_id=category.id)
     _create_project(
         admin, name="Deprecated Tool", url="https://example.internal/old",
@@ -362,19 +362,19 @@ def test_filter_by_category_and_status(client, admin_user, employee, category):
     )
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     assert staff.get(f"/api/projects?category_id={category.id}").json()["total"] == 1
     assert staff.get("/api/projects?status=DEPRECATED").json()["total"] == 1
 
 
 def test_sort_by_name_and_most_used(client, admin_user, employee, category):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     first = _create_project(admin, name="Alpha Tool", category_id=category.id)
     _create_project(admin, name="Beta Tool", url="https://example.internal/beta",
                     category_id=category.id)
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     names = [p["name"] for p in staff.get("/api/projects?sort=name").json()["items"]]
     assert names == ["Alpha Tool", "Beta Tool"]
 
@@ -384,14 +384,14 @@ def test_sort_by_name_and_most_used(client, admin_user, employee, category):
 
 
 def test_search_only_covers_visible_projects(client, admin_user, employee):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     _create_project(
         admin, name="Secret MSCI Console", url="https://example.internal/secret",
         visibility="ADMIN_ONLY",
     )
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     assert staff.get("/api/projects?search=MSCI").json()["total"] == 0
 
 
@@ -406,7 +406,7 @@ def test_project_detail_view_is_audited(as_employee, db, project):
 def test_project_detail_hides_permission_list_from_employees(
     client, admin_user, employee, other_employee
 ):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     created = _create_project(
         admin, name="Pilot Tool", url="https://example.internal/pilot",
         visibility="SPECIFIC_EMPLOYEES",
@@ -414,7 +414,7 @@ def test_project_detail_hides_permission_list_from_employees(
     )
     admin.post("/api/auth/logout")
 
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     detail = staff.get(f"/api/projects/{created['id']}").json()
     # A permitted employee must not learn who else has access.
     assert detail["allowed_employee_ids"] == []

@@ -23,7 +23,7 @@ def _create_employee(api, **overrides) -> dict:
 
 
 def test_admin_creates_employee_who_can_then_log_in(client, admin_user):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     body = _create_employee(admin)
     temp_password = body["temporary_password"]
     assert temp_password, "a temporary password should be issued and shown once"
@@ -33,18 +33,18 @@ def test_admin_creates_employee_who_can_then_log_in(client, admin_user):
 
     response = client.post(
         "/api/auth/login",
-        json={"employee_id": "ARWL77777", "password": temp_password},
+        json={"username": "New Joiner", "password": temp_password},
     )
     assert response.status_code == 200
     assert response.json()["must_change_password"] is True
 
 
 def test_new_employee_must_change_password_before_using_the_portal(client, admin_user):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     body = _create_employee(admin)
     admin.post("/api/auth/logout")
 
-    api = login(client, "ARWL77777", body["temporary_password"])
+    api = login(client, "New Joiner", body["temporary_password"])
     # Blocked from normal use...
     assert api.get("/api/projects").status_code == 403
     # ...but able to set a new password.
@@ -128,30 +128,30 @@ def test_admin_can_change_a_role(as_admin, db, employee):
 
 
 def test_promoted_user_gains_admin_access(client, admin_user, employee):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     admin.put(f"/api/admin/users/{employee.id}", json={"role": "ADMIN"})
     admin.post("/api/auth/logout")
 
-    promoted = login(client, employee.employee_id)
+    promoted = login(client, employee.full_name)
     assert promoted.get("/api/admin/users").status_code == 200
 
 
 def test_disable_then_enable_an_employee(client, db, admin_user, employee):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     assert admin.post(f"/api/admin/users/{employee.id}/disable").status_code == 200
 
     db.expire_all()
     assert db.get(User, employee.id).is_active is False
     assert client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": TEST_PASSWORD},
+        json={"username": employee.full_name, "password": TEST_PASSWORD},
     ).status_code == 401
 
     assert admin.post(f"/api/admin/users/{employee.id}/enable").status_code == 200
     admin.post("/api/auth/logout")
     assert client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": TEST_PASSWORD},
+        json={"username": employee.full_name, "password": TEST_PASSWORD},
     ).status_code == 200
 
 
@@ -164,7 +164,7 @@ def test_disable_is_audited(as_admin, db, employee):
 
 
 def test_admin_reset_password_issues_a_working_temporary_password(client, admin_user, employee):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     response = admin.post(f"/api/admin/users/{employee.id}/reset-password")
     assert response.status_code == 200
     temp_password = response.json()["temporary_password"]
@@ -173,22 +173,22 @@ def test_admin_reset_password_issues_a_working_temporary_password(client, admin_
     # The old password no longer works; the new one does.
     assert client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": TEST_PASSWORD},
+        json={"username": employee.full_name, "password": TEST_PASSWORD},
     ).status_code == 401
     login_response = client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": temp_password},
+        json={"username": employee.full_name, "password": temp_password},
     )
     assert login_response.status_code == 200
     assert login_response.json()["must_change_password"] is True
 
 
 def test_reset_password_revokes_existing_sessions(client, admin_user, employee):
-    login(client, employee.employee_id)
+    login(client, employee.full_name)
     victim_cookies = dict(client.cookies)
     client.cookies.clear()
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     admin.post(f"/api/admin/users/{employee.id}/reset-password")
     client.cookies.clear()
 
@@ -198,11 +198,11 @@ def test_reset_password_revokes_existing_sessions(client, admin_user, employee):
 
 
 def test_soft_delete_keeps_the_row_and_the_audit_trail(client, db, admin_user, employee, project):
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     staff.post(f"/api/projects/{project.id}/open")
     staff.post("/api/auth/logout")
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     assert admin.delete(f"/api/admin/users/{employee.id}").status_code == 200
 
     db.expire_all()
@@ -218,12 +218,12 @@ def test_soft_delete_keeps_the_row_and_the_audit_trail(client, db, admin_user, e
 
 
 def test_deleted_user_cannot_log_in(client, admin_user, employee):
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     admin.delete(f"/api/admin/users/{employee.id}")
     admin.post("/api/auth/logout")
     assert client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": TEST_PASSWORD},
+        json={"username": employee.full_name, "password": TEST_PASSWORD},
     ).status_code == 401
 
 
@@ -233,15 +233,15 @@ def test_admin_can_unlock_a_locked_account(client, db, admin_user, employee):
     for _ in range(settings.MAX_FAILED_LOGIN_ATTEMPTS):
         client.post(
             "/api/auth/login",
-            json={"employee_id": employee.employee_id, "password": "Wrong1!Password"},
+            json={"username": employee.full_name, "password": "Wrong1!Password"},
         )
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     assert admin.post(f"/api/admin/users/{employee.id}/unlock").status_code == 200
     admin.post("/api/auth/logout")
 
     assert client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": TEST_PASSWORD},
+        json={"username": employee.full_name, "password": TEST_PASSWORD},
     ).status_code == 200
 
 
@@ -260,10 +260,10 @@ def test_user_search_and_filters(as_admin, employee, other_employee):
 
 
 def test_admin_can_view_a_users_activity_and_login_history(client, admin_user, employee):
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     staff.post("/api/auth/logout")
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     activity = admin.get(f"/api/admin/users/{employee.id}/activity").json()
     assert activity["total"] >= 1
 

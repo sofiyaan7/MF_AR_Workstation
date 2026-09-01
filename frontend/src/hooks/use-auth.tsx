@@ -19,7 +19,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isAdmin: boolean;
   mustChangePassword: boolean;
-  login: (employeeId: string, password: string) => Promise<UserProfile>;
+  login: (username: string, password: string) => Promise<UserProfile>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   setUser: (user: UserProfile) => void;
@@ -68,8 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient]);
 
   const login = React.useCallback(
-    async (employeeId: string, password: string) => {
-      const response = await authApi.login(employeeId, password);
+    async (username: string, password: string) => {
+      const response = await authApi.login(username, password);
       setUserState(response.user);
       queryClient.clear();
       return response.user;

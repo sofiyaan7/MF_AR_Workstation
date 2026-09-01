@@ -16,7 +16,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [employeeId, setEmployeeId] = React.useState("");
+  const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
@@ -33,7 +33,7 @@ export function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const user = await login(employeeId.trim(), password);
+      const user = await login(username.trim(), password);
       toast.success(`Welcome back, ${firstName(user.full_name)}`);
       const from = (location.state as { from?: string } | null)?.from ?? "/";
       navigate(user.must_change_password ? "/security" : from, { replace: true });
@@ -49,12 +49,12 @@ export function LoginPage() {
   };
 
   const handleForgotPassword = async () => {
-    if (!employeeId.trim()) {
-      setError("Enter your Employee ID first, then choose “Forgot password”.");
+    if (!username.trim()) {
+      setError("Enter your full name first, then choose “Forgot password”.");
       return;
     }
     try {
-      const response = await authApi.forgotPassword(employeeId.trim());
+      const response = await authApi.forgotPassword(username.trim());
       setForgotSent(true);
       toast.success(response.message, { description: response.detail ?? undefined });
     } catch {
@@ -118,27 +118,26 @@ export function LoginPage() {
 
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Use the Employee ID issued by your portal administrator.
+            Use your full name, as registered by your portal administrator.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4" noValidate>
             <div className="space-y-1.5">
-              <Label htmlFor="employee_id" required>
-                Employee ID
+              <Label htmlFor="username" required>
+                Full name
               </Label>
               <Input
-                id="employee_id"
-                name="employee_id"
-                value={employeeId}
-                onChange={(event) => setEmployeeId(event.target.value)}
-                placeholder="ARWL12345"
+                id="username"
+                name="username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder="Sofiyaan Sameer"
                 autoComplete="username"
-                autoCapitalize="characters"
+                autoCapitalize="words"
                 spellCheck={false}
                 required
                 autoFocus
                 aria-invalid={Boolean(error)}
-                className="font-mono tracking-wide"
               />
             </div>
 

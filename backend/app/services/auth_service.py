@@ -91,6 +91,39 @@ def check_login_rate_limit(
         )
 
 
+def normalise_name(value: str) -> str:
+    """Fold a display name to its comparison form: trimmed, single-spaced, lower."""
+    return " ".join((value or "").split()).lower()
+
+
+def get_user_by_username(db: DbSession, username: str) -> User | list[User] | None:
+    """Resolve a sign-in name to exactly one account.
+
+    Full names are not unique the way employee IDs are — namesakes are normal —
+    so this can legitimately match several rows. When it does, the sign-in-able
+    accounts decide it: exactly one means that is the person, and anything else
+    is genuinely ambiguous. A list is returned in that case so the caller can
+    refuse rather than guess, because guessing would sign somebody into a
+    colleague's account.
+    """
+    wanted = normalise_name(username)
+    if not wanted:
+        return None
+
+    candidates = [
+        user
+        for user in db.execute(select(User).where(User.is_deleted.is_(False))).scalars().unique()
+        if normalise_name(user.full_name) == wanted
+    ]
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+
+    usable = [user for user in candidates if user.can_login]
+    return usable[0] if len(usable) == 1 else candidates
+
+
 def get_user_by_employee_id(db: DbSession, employee_id: str) -> User | None:
     return db.execute(
         select(User).where(
@@ -102,17 +135,25 @@ def get_user_by_employee_id(db: DbSession, employee_id: str) -> User | None:
 
 def authenticate(
     db: DbSession,
-    employee_id: str,
+    username: str,
     password: str,
     context: RequestContext | None = None,
 ) -> User:
-    """Validate credentials or raise. Every outcome is recorded."""
-    employee_id = (employee_id or "").strip()
-    if not employee_id or not password:
+    """Validate credentials or raise. Every outcome is recorded.
+
+    ``username`` is the person's full name. The audit trail and the rate-limit
+    bucket key on whatever identifier was submitted, which is what an operator
+    reading the log needs to see.
+    """
+    username = (username or "").strip()
+    if not username or not password:
         raise AuthenticationError(GENERIC_LOGIN_ERROR)
 
-    check_login_rate_limit(db, employee_id, context)
-    user = get_user_by_employee_id(db, employee_id)
+    check_login_rate_limit(db, username, context)
+    resolved = get_user_by_username(db, username)
+    # Several sign-in-able namesakes: there is no safe way to choose one.
+    ambiguous = isinstance(resolved, list)
+    user = None if ambiguous else resolved
 
     def fail(reason: str, *, error: Exception | None = None) -> None:
         """Persist the attempt, then raise.
@@ -121,26 +162,26 @@ def authenticate(
         request transaction back, which would otherwise discard both the audit
         trail and the incremented lockout counter.
         """
-        _record_attempt(db, employee_id, user=user, successful=False, reason=reason, context=context)
+        _record_attempt(db, username, user=user, successful=False, reason=reason, context=context)
         record_activity(
             db,
             event_type=EventType.FAILED_LOGIN,
             user=user,
-            employee_id=employee_id,
+            employee_id=username,
             user_name=user.full_name if user else None,
             description=f"Failed login attempt ({reason})",
             success=False,
             context=context,
             metadata={"reason": reason},
         )
-        logger.warning("Failed login for employee_id=%s reason=%s", employee_id, reason)
+        logger.warning("Failed login for username=%s reason=%s", username, reason)
         db.commit()
         raise error or AuthenticationError(GENERIC_LOGIN_ERROR)
 
     if user is None:
         # Verify against a real hash so timing does not reveal non-existence.
         security.verify_password(password, security.DUMMY_HASH)
-        fail("unknown_employee_id")
+        fail("ambiguous_name" if ambiguous else "unknown_username")
 
     locked_until = _as_utc(user.locked_until)
     if locked_until and locked_until > utcnow():
@@ -189,7 +230,7 @@ def authenticate(
     user.login_count += 1
     db.add(user)
 
-    _record_attempt(db, employee_id, user=user, successful=True, reason=None, context=context)
+    _record_attempt(db, username, user=user, successful=True, reason=None, context=context)
     record_activity(
         db,
         event_type=EventType.LOGIN,

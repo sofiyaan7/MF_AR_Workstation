@@ -6,15 +6,15 @@ from tests.conftest import login
 
 
 def test_analytics_reflects_real_activity(client, admin_user, employee, project):
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     staff.post(f"/api/projects/{project.id}/open")
     staff.post(f"/api/projects/{project.id}/open")
     staff.post("/api/auth/logout")
     client.post(
-        "/api/auth/login", json={"employee_id": employee.employee_id, "password": "wrong"}
+        "/api/auth/login", json={"username": employee.full_name, "password": "wrong"}
     )
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     overview = admin.get("/api/admin/analytics/overview").json()
 
     assert overview["total_users"] == 2
@@ -52,11 +52,11 @@ def test_analytics_starts_empty_with_no_fabricated_numbers(as_admin):
 
 def test_project_usage_stats(client, admin_user, employee, other_employee, project):
     for user in (employee, other_employee):
-        api = login(client, user.employee_id)
+        api = login(client, user.full_name)
         api.post(f"/api/projects/{project.id}/open")
         api.post("/api/auth/logout")
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     stats = admin.get(f"/api/admin/projects/{project.id}/stats?days=7").json()
 
     assert stats["total_opens"] == 2
@@ -68,12 +68,12 @@ def test_project_usage_stats(client, admin_user, employee, other_employee, proje
 
 
 def test_activity_filters(client, admin_user, employee, project):
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     staff.post(f"/api/projects/{project.id}/open")
     staff.post(f"/api/projects/{project.id}/favourite")
     staff.post("/api/auth/logout")
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     assert admin.get("/api/admin/activity?event_type=PROJECT_OPENED").json()["total"] == 1
     assert admin.get(
         f"/api/admin/activity?employee_id={employee.employee_id}"
@@ -92,11 +92,11 @@ def test_activity_records_ip_and_browser(as_employee, project):
 
 
 def test_csv_export(client, admin_user, employee, project):
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     staff.post(f"/api/projects/{project.id}/open")
     staff.post("/api/auth/logout")
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     response = admin.get("/api/admin/activity/export")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
@@ -111,11 +111,11 @@ def test_csv_export(client, admin_user, employee, project):
 
 
 def test_csv_export_respects_filters(client, admin_user, employee, project):
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     staff.post(f"/api/projects/{project.id}/open")
     staff.post("/api/auth/logout")
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     response = admin.get("/api/admin/activity/export?event_type=PROJECT_OPENED")
     rows = list(csv.reader(io.StringIO(response.text)))[1:]
     assert len(rows) == 1
@@ -124,9 +124,9 @@ def test_csv_export_respects_filters(client, admin_user, employee, project):
 def test_login_attempts_endpoint_lists_failures(client, admin_user, employee):
     client.post(
         "/api/auth/login",
-        json={"employee_id": employee.employee_id, "password": "Wrong1!Password"},
+        json={"username": employee.full_name, "password": "Wrong1!Password"},
     )
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     body = admin.get("/api/admin/login-attempts?successful=false").json()
     assert body["total"] == 1
     assert body["items"][0]["failure_reason"] == "bad_password"
@@ -134,11 +134,11 @@ def test_login_attempts_endpoint_lists_failures(client, admin_user, employee):
 
 def test_admin_activity_answers_who_did_what(client, admin_user, employee, project):
     """The audit trail must attribute each action to a person and a time."""
-    staff = login(client, employee.employee_id)
+    staff = login(client, employee.full_name)
     staff.post(f"/api/projects/{project.id}/open")
     staff.post("/api/auth/logout")
 
-    admin = login(client, admin_user.employee_id)
+    admin = login(client, admin_user.full_name)
     entry = admin.get("/api/admin/activity?event_type=PROJECT_OPENED").json()["items"][0]
     assert entry["employee_id"] == employee.employee_id
     assert entry["user_name"] == "Sofiyaan Sameer"
