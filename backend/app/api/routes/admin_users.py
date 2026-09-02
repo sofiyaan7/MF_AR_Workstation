@@ -245,6 +245,20 @@ def update_user(
 
     if "full_name" in changes and changes["full_name"]:
         _reject_duplicate_name(db, changes["full_name"], exclude_id=user.id)
+    if "employee_id" in changes and changes["employee_id"]:
+        # Same scoping as the partial unique index: a soft-deleted account does
+        # not reserve an ID.
+        taken = db.execute(
+            select(User.id).where(
+                func.lower(User.employee_id) == str(changes["employee_id"]).lower(),
+                User.id != user.id,
+                User.is_deleted.is_(False),
+            )
+        ).first()
+        if taken:
+            raise ConflictError(
+                f"Employee ID '{changes['employee_id']}' is already in use."
+            )
     if "email" in changes and changes["email"]:
         clash = db.execute(
             select(User.id).where(
@@ -262,7 +276,15 @@ def update_user(
     for field, value in changes.items():
         if value is None and field in {"role", "status", "is_active"}:
             continue
-        if field == "role":
+        if field == "employee_id":
+            if not value:
+                continue
+            # Worth an explicit audit line: it is the identifier every previous
+            # log entry was written against, and those entries keep the old one.
+            if value != user.employee_id:
+                audit["employee_id"] = f"{user.employee_id} -> {value}"
+            user.employee_id = value
+        elif field == "role":
             user.role_id = _get_role(db, value).id
             audit["role"] = f"{previous_role} -> {value}"
         elif field == "status":

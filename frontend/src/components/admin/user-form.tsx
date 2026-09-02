@@ -166,9 +166,10 @@ export function UserFormDialog({
     setValues((current) => ({ ...current, [key]: value }));
 
   const nameValid = values.full_name.trim().length >= 2;
+  const editIdValid = !isEdit || /^[A-Za-z0-9_-]{2,64}$/.test(values.employee_id.trim());
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim());
   const canSubmit =
-    nameValid && emailValid && !create.isPending && !update.isPending;
+    nameValid && emailValid && editIdValid && !create.isPending && !update.isPending;
 
   // Only a super admin may grant the super-admin role; the API enforces this too.
   const canGrantSuperAdmin = currentUser?.role === "SUPER_ADMIN";
@@ -184,6 +185,7 @@ export function UserFormDialog({
           id: user.id,
           payload: {
             full_name: values.full_name.trim(),
+            employee_id: values.employee_id.trim().toUpperCase(),
             email: values.email.trim(),
             department: values.department.trim() || null,
             job_title: values.job_title.trim() || null,
@@ -229,25 +231,34 @@ export function UserFormDialog({
           <DialogTitle>{isEdit ? `Edit ${user?.full_name}` : "Add employee"}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "The employee ID is fixed once an account exists."
+              ? "Details, including the employee ID, can be corrected here."
               : "A name and an email address are all that is needed. They sign in with the name."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
-            {/* Employee ID is allocated by the server from the name. It is shown
-                here only when editing, where it is fixed and worth surfacing. */}
+            {/* Allocated by the server at creation, editable afterwards so a
+                generated placeholder or a typo can be corrected. */}
             {isEdit && (
               <div className="space-y-1.5">
                 <Label htmlFor="user-employee-id">Employee ID</Label>
                 <Input
                   id="user-employee-id"
                   value={values.employee_id}
+                  onChange={(event) => set("employee_id", event.target.value.toUpperCase())}
                   className="font-mono"
-                  disabled
-                  readOnly
+                  aria-invalid={touched && !editIdValid}
                 />
+                {touched && !editIdValid ? (
+                  <p className="text-xs text-destructive">
+                    Use 2–64 letters, numbers, hyphens or underscores.
+                  </p>
+                ) : (
+                  <p className="text-2xs text-muted-foreground">
+                    Past activity keeps the ID it was recorded under.
+                  </p>
+                )}
               </div>
             )}
 

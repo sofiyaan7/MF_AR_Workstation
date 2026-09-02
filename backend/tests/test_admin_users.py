@@ -389,3 +389,72 @@ def test_two_live_users_still_cannot_share_an_email(client, admin_user):
         "/api/admin/users", json={"full_name": "Second Person", "email": "shared@example.com"}
     )
     assert clash.status_code == 409
+
+
+def test_employee_id_can_be_corrected_after_creation(client, admin_user):
+    """IDs are generated now, so a placeholder or typo needs a way out."""
+    admin = login(client, admin_user.full_name)
+    created = _create_employee(admin, employee_id="ARWL00001")["user"]
+
+    updated = admin.put(
+        f"/api/admin/users/{created['id']}", json={"employee_id": "arwl-2024-7"}
+    )
+    assert updated.status_code == 200, updated.text
+    # Normalised the same way creation does.
+    assert updated.json()["employee_id"] == "ARWL-2024-7"
+
+
+def test_changing_an_employee_id_does_not_end_the_session(client, admin_user):
+    """The access token carries the ID but nothing reads it; sessions key on the user id."""
+    admin = login(client, admin_user.full_name)
+    before = admin.get("/api/auth/me").json()["employee_id"]
+
+    changed = admin.put(
+        f"/api/admin/users/{admin_user.id}", json={"employee_id": "NEWADMIN1"}
+    )
+    assert changed.status_code == 200
+
+    me = admin.get("/api/auth/me")
+    assert me.status_code == 200
+    assert me.json()["employee_id"] == "NEWADMIN1" != before
+
+
+def test_employee_id_cannot_collide_with_a_live_account(client, admin_user, employee):
+    admin = login(client, admin_user.full_name)
+    response = admin.put(
+        f"/api/admin/users/{employee.id}", json={"employee_id": admin_user.employee_id}
+    )
+    assert response.status_code == 409
+    assert "already in use" in response.json()["message"]
+
+
+def test_employee_id_may_reuse_one_freed_by_deletion(client, admin_user, employee):
+    admin = login(client, admin_user.full_name)
+    freed = _create_employee(admin, employee_id="FREEDID1")["user"]
+    assert admin.delete(f"/api/admin/users/{freed['id']}").status_code == 200
+
+    response = admin.put(f"/api/admin/users/{employee.id}", json={"employee_id": "FREEDID1"})
+    assert response.status_code == 200
+    assert response.json()["employee_id"] == "FREEDID1"
+
+
+def test_an_invalid_employee_id_is_rejected(client, admin_user, employee):
+    admin = login(client, admin_user.full_name)
+    assert admin.put(
+        f"/api/admin/users/{employee.id}", json={"employee_id": "has spaces!"}
+    ).status_code == 422
+
+
+def test_the_employee_id_change_is_audited(client, admin_user, employee, db):
+    from app.models.activity import ActivityLog
+
+    admin = login(client, admin_user.full_name)
+    old_id = employee.employee_id
+    admin.put(f"/api/admin/users/{employee.id}", json={"employee_id": "AUDITED1"})
+
+    log = db.execute(
+        select(ActivityLog).where(ActivityLog.event_type == "USER_UPDATED")
+        .order_by(ActivityLog.id.desc())
+    ).scalars().first()
+    assert log is not None
+    assert f"{old_id} -> AUDITED1" in str(log.event_metadata)

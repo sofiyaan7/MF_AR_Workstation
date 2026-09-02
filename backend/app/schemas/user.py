@@ -100,6 +100,9 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=160)
+    # Correctable after the fact: the ID is generated at creation, so a
+    # placeholder or a typo needs a way out.
+    employee_id: str | None = Field(default=None, min_length=2, max_length=64)
     email: EmailStr | None = None
     department: str | None = Field(default=None, max_length=120)
     job_title: str | None = Field(default=None, max_length=120)
@@ -108,6 +111,11 @@ class UserUpdate(BaseModel):
     status: AccountStatus | None = None
     is_active: bool | None = None
     notes: str | None = Field(default=None, max_length=2000)
+
+
+    _clean_employee_id = field_validator("employee_id")(
+        UserCreate._clean_employee_id.__func__  # type: ignore[attr-defined]
+    )
 
 
 class UserCreatedResponse(BaseModel):
