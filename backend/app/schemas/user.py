@@ -137,5 +137,10 @@ class ProfileUpdate(BaseModel):
     """Fields a user may change about themselves."""
 
     full_name: str | None = Field(default=None, min_length=2, max_length=160)
+    employee_id: str | None = Field(default=None, min_length=2, max_length=64)
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=40)
+
+    _clean_employee_id = field_validator("employee_id")(
+        UserCreate._clean_employee_id.__func__  # type: ignore[attr-defined]
+    )

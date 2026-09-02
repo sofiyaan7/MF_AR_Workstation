@@ -396,3 +396,38 @@ def test_duplicate_sign_in_names_are_rejected_at_creation(client, admin_user, em
     )
     assert response.status_code == 409
     assert "sign-in name" in response.json()["message"]
+
+
+def test_a_user_can_change_their_own_employee_id(client, employee):
+    api = login(client, employee.full_name)
+    response = api.put("/api/auth/me", json={"employee_id": "my-own-99"})
+    assert response.status_code == 200, response.text
+    assert response.json()["employee_id"] == "MY-OWN-99"
+
+
+def test_a_user_cannot_take_a_colleagues_employee_id(client, employee, other_employee):
+    api = login(client, employee.full_name)
+    response = api.put("/api/auth/me", json={"employee_id": other_employee.employee_id})
+    assert response.status_code == 409
+    assert "already in use" in response.json()["message"]
+
+
+def test_a_user_cannot_rename_onto_a_colleagues_name(client, employee, other_employee):
+    """Names are sign-in credentials: a clash would lock out both accounts."""
+    api = login(client, employee.full_name)
+    response = api.put("/api/auth/me", json={"full_name": other_employee.full_name})
+    assert response.status_code == 409
+    assert "sign-in name" in response.json()["message"]
+
+
+def test_renaming_yourself_changes_how_you_sign_in(client, employee):
+    api = login(client, employee.full_name)
+    assert api.put("/api/auth/me", json={"full_name": "Brand New Name"}).status_code == 200
+    api.post("/api/auth/logout")
+
+    assert client.post(
+        "/api/auth/login", json={"username": employee.full_name, "password": TEST_PASSWORD}
+    ).status_code == 401
+    assert client.post(
+        "/api/auth/login", json={"username": "Brand New Name", "password": TEST_PASSWORD}
+    ).status_code == 200

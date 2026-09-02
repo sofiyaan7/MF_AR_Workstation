@@ -16,7 +16,12 @@ export const authApi = {
     unwrap<LoginResponse>(api.post("/auth/login", { username, password })),
   logout: () => unwrap<ApiMessage>(api.post("/auth/logout")),
   me: () => unwrap<UserProfile>(api.get("/auth/me")),
-  updateProfile: (payload: { full_name?: string; email?: string; phone?: string }) =>
+  updateProfile: (payload: {
+    full_name?: string;
+    employee_id?: string;
+    email?: string;
+    phone?: string;
+  }) =>
     unwrap<UserProfile>(api.put("/auth/me", payload)),
   changePassword: (payload: {
     current_password: string;

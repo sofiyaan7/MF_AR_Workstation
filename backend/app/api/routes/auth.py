@@ -79,21 +79,20 @@ def me(user: CurrentUser) -> UserProfile:
 
 @router.put("/me", response_model=UserProfile)
 def update_me(payload: ProfileUpdate, user: CurrentUserCsrf, db: Db, ctx: Ctx) -> UserProfile:
-    """Self-service profile update. Role, status and employee ID are admin-only."""
+    """Self-service profile update. Role and status remain admin-only."""
     changes = payload.model_dump(exclude_unset=True, exclude_none=True)
-    if "email" in changes:
-        from sqlalchemy import func, select
 
-        from app.models.user import User as UserModel
-
-        clash = db.execute(
-            select(UserModel.id).where(
-                func.lower(UserModel.email) == str(changes["email"]).lower(),
-                UserModel.id != user.id,
-            )
-        ).first()
-        if clash:
-            raise ValidationError("That email address is already in use.")
+    # The same uniqueness rules the admin console applies. The name one is not
+    # cosmetic: it is the sign-in credential, so renaming onto a colleague's
+    # name would leave both accounts ambiguous and lock them both out.
+    if changes.get("full_name"):
+        auth_service.reject_duplicate_name(db, changes["full_name"], exclude_id=user.id)
+    if changes.get("employee_id"):
+        auth_service.reject_duplicate_employee_id(
+            db, changes["employee_id"], exclude_id=user.id
+        )
+    if changes.get("email"):
+        auth_service.reject_duplicate_email(db, changes["email"], exclude_id=user.id)
 
     for field, value in changes.items():
         setattr(user, field, str(value) if field == "email" else value)

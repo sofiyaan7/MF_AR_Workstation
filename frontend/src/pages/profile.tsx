@@ -30,18 +30,23 @@ export function ProfilePage() {
   const { user, setUser } = useAuth();
   const [fullName, setFullName] = React.useState(user?.full_name ?? "");
   const [email, setEmail] = React.useState(user?.email ?? "");
+  const [employeeId, setEmployeeId] = React.useState(user?.employee_id ?? "");
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (user) {
       setFullName(user.full_name);
       setEmail(user.email);
+      setEmployeeId(user.employee_id);
     }
   }, [user]);
 
   if (!user) return null;
 
-  const dirty = fullName.trim() !== user.full_name || email.trim() !== user.email;
+  const dirty =
+    fullName.trim() !== user.full_name ||
+    email.trim() !== user.email ||
+    employeeId.trim().toUpperCase() !== user.employee_id;
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -49,6 +54,7 @@ export function ProfilePage() {
     try {
       const updated = await authApi.updateProfile({
         full_name: fullName.trim(),
+        employee_id: employeeId.trim().toUpperCase(),
         email: email.trim(),
       });
       setUser(updated);
@@ -92,7 +98,7 @@ export function ProfilePage() {
           <CardHeader>
             <CardTitle className="text-base">Account details</CardTitle>
             <CardDescription>
-              Employee ID, department and role are managed by your administrator.
+              Department and role are managed by your administrator.
             </CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-border pt-0">
@@ -119,7 +125,8 @@ export function ProfilePage() {
           <CardHeader>
             <CardTitle className="text-base">Edit your details</CardTitle>
             <CardDescription>
-              You can update your own name and email. Changes are recorded in the audit log.
+              You can update your own name, employee ID and email. Your name is what
+              you sign in with. Changes are recorded in the audit log.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -134,6 +141,21 @@ export function ProfilePage() {
                   maxLength={160}
                   required
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="employee_id">Employee ID</Label>
+                <Input
+                  id="employee_id"
+                  value={employeeId}
+                  onChange={(event) => setEmployeeId(event.target.value.toUpperCase())}
+                  minLength={2}
+                  maxLength={64}
+                  className="font-mono"
+                  required
+                />
+                <p className="text-2xs text-muted-foreground">
+                  Past activity keeps the ID it was recorded under.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email</Label>

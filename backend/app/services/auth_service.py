@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session as DbSession
 from app.core import security
 from app.core.config import settings
 from app.core.exceptions import (
-    AccountLockedError, AuthenticationError, RateLimitError, ValidationError,
+    AccountLockedError, AuthenticationError, ConflictError, RateLimitError, ValidationError,
 )
 from app.core.logging_config import get_logger
 from app.core.password_policy import PasswordPolicyError, validate_password
@@ -122,6 +122,51 @@ def get_user_by_username(db: DbSession, username: str) -> User | list[User] | No
 
     usable = [user for user in candidates if user.can_login]
     return usable[0] if len(usable) == 1 else candidates
+
+
+def reject_duplicate_name(db: DbSession, full_name: str, *, exclude_id: int | None = None) -> None:
+    """Full names are sign-in credentials, so they have to be unique.
+
+    Compared on the same normalised form authentication uses, and scoped to
+    accounts that are not deleted — a namesake who has left should not block a
+    new joiner. Shared by the admin console and self-service profile editing:
+    a user renaming themselves onto a colleague's name would make both of them
+    ambiguous and lock them both out.
+    """
+    wanted = normalise_name(full_name)
+    for other in db.execute(select(User).where(User.is_deleted.is_(False))).scalars().unique():
+        if other.id != exclude_id and normalise_name(other.full_name) == wanted:
+            raise ConflictError(
+                f"'{full_name.strip()}' is already the sign-in name for another account. "
+                "Names are used to sign in, so they must be unique."
+            )
+
+
+def reject_duplicate_email(db: DbSession, email: str, *, exclude_id: int | None = None) -> None:
+    """Live accounts only, matching the partial unique index."""
+    clash = db.execute(
+        select(User.id).where(
+            func.lower(User.email) == str(email).lower(),
+            User.id != exclude_id,
+            User.is_deleted.is_(False),
+        )
+    ).first()
+    if clash:
+        raise ConflictError("That email address is already in use.")
+
+
+def reject_duplicate_employee_id(
+    db: DbSession, employee_id: str, *, exclude_id: int | None = None
+) -> None:
+    clash = db.execute(
+        select(User.id).where(
+            func.lower(User.employee_id) == str(employee_id).lower(),
+            User.id != exclude_id,
+            User.is_deleted.is_(False),
+        )
+    ).first()
+    if clash:
+        raise ConflictError(f"Employee ID '{employee_id}' is already in use.")
 
 
 def get_user_by_employee_id(db: DbSession, employee_id: str) -> User | None:
