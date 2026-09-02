@@ -145,12 +145,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <Separator className="my-3 bg-sidebar-border" />
           <NavSection title="Settings" items={SETTINGS_NAV} onNavigate={onClose} />
         </nav>
-
-        <div className="shrink-0 border-t border-sidebar-border px-4 py-3">
-          <p className="text-2xs text-sidebar-muted">
-            Every launch and sign-in is recorded in the portal audit log.
-          </p>
-        </div>
       </aside>
     </>
   );
