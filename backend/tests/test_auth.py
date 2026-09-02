@@ -39,17 +39,17 @@ def test_login_wrong_password_rejected(client, employee):
         json={"username": employee.full_name, "password": "WrongPassword1!"},
     )
     assert response.status_code == 401
-    assert response.json()["message"] == "Invalid Employee ID or password"
+    assert response.json()["message"] == "Invalid name or password"
 
 
-def test_login_unknown_employee_id_gives_identical_error(client, employee):
+def test_login_unknown_name_gives_identical_error(client, employee):
     response = client.post(
         "/api/auth/login",
         json={"username": "NOT-A-REAL-ID", "password": TEST_PASSWORD},
     )
     assert response.status_code == 401
     # Identical wording prevents employee-ID enumeration.
-    assert response.json()["message"] == "Invalid Employee ID or password"
+    assert response.json()["message"] == "Invalid name or password"
 
 
 def test_only_authorized_employees_can_log_in(client, db, roles):

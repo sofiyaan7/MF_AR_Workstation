@@ -21,7 +21,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, response: Response, db: Db, ctx: Ctx) -> LoginResponse:
-    """Exchange Employee ID + password for an authenticated session."""
+    """Exchange full name + password for an authenticated session."""
     user = auth_service.authenticate(db, payload.username, payload.password, ctx)
     access, refresh, csrf = auth_service.issue_session(db, user, ctx)
     set_auth_cookies(response, access, refresh, csrf)
@@ -79,7 +79,7 @@ def me(user: CurrentUser) -> UserProfile:
 
 @router.put("/me", response_model=UserProfile)
 def update_me(payload: ProfileUpdate, user: CurrentUserCsrf, db: Db, ctx: Ctx) -> UserProfile:
-    """Self-service profile update. Role, status and Employee ID are not editable here."""
+    """Self-service profile update. Role, status and employee ID are admin-only."""
     changes = payload.model_dump(exclude_unset=True, exclude_none=True)
     if "email" in changes:
         from sqlalchemy import func, select
@@ -160,7 +160,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Db, ctx: Ctx) -> Message
     return Message(
         message="Request received",
         detail=(
-            "If that Employee ID exists, an administrator has been notified. "
+            "If that name matches an account, an administrator has been notified. "
             "Please contact your portal administrator to receive a temporary password."
         ),
     )

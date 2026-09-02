@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 # Returned for every failed login regardless of cause, so the endpoint cannot be
 # used to enumerate valid employee IDs.
-GENERIC_LOGIN_ERROR = "Invalid Employee ID or password"
+GENERIC_LOGIN_ERROR = "Invalid name or password"
 
 
 def _as_utc(value: datetime | None) -> datetime | None:
